@@ -34,9 +34,29 @@ inventing a new one.
    pattern) — it's picked up automatically, nothing else to wire.
 8. **Seed data**: extend `src/seed.ts` using the new entity's repository,
    same pattern as the `User` seeding — go through TypeORM, not raw SQL.
-9. **Test**: copy `src/__tests__/auth.test.ts` as the template — boot
-   `createApp()`, hit real routes with supertest against a real (migrated)
-   DB, clean up what the test created in `afterAll`.
+9. **Verify manually**: no automated test suite — hit the new routes via
+   Swagger UI (`/api-docs`) or a REST client against a real migrated DB.
+10. **Update the registry**: add the new routes to
+    `.claude/registry/API_ENDPOINTS.md` and the new table to
+    `.claude/registry/DB_SCHEMA.md`, in the same commit — check them first so
+    you don't duplicate an existing route/table.
+
+## Naming conventions
+
+- Files: `<name>.entity.ts` is just `entities/<Name>.ts`; elsewhere it's
+  `<name>.service.ts`, `<name>.controller.ts`, `<name>.routes.ts` (see `auth.*`).
+- Entities: PascalCase class/file name, singular (`Contract`, not `Contracts`).
+  Routes: plural, lowercase, kebab-case for multi-word (`/pay-runs`).
+- DB columns: `snake_case` via `@Column({ name: '...' })`, entity properties stay
+  `camelCase` — same split as `User.passwordHash` → `password_hash`.
+
+## Roles
+
+See root `CLAUDE.md` for the 5-role model (Employee, HR Manager, HR Payroll
+User, HR Payroll Manager, Admin) and the known gap: `UserRole` here still only
+has `user`/`admin`. Every new module's route guards should be written against
+the 5-role table from the start, even before the enum is expanded — don't gate
+new payroll/HR routes on `admin` as a stand-in.
 
 ## Notes
 

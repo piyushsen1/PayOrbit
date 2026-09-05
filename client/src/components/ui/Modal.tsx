@@ -40,7 +40,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-gray-900/50"
+            className="absolute inset-0 bg-black/40"
             onClick={onClose}
             aria-hidden="true"
           />
@@ -53,11 +53,21 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
             animate="visible"
             exit="hidden"
             className={cn(
-              'relative z-10 w-full max-w-md rounded-lg bg-surface p-6 shadow-xl',
+              'relative z-10 w-full max-w-md rounded-3xl border border-[var(--border-default)] bg-[var(--surface-card)] p-6 shadow-glow-lg',
               className
             )}
           >
-            {title && <h2 className="mb-4 text-xl font-semibold text-text">{title}</h2>}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-[var(--text-tertiary)] hover:bg-[var(--surface-sunken)]"
+            >
+              <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}>
+                <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+              </svg>
+            </button>
+            {title && <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">{title}</h2>}
             {children}
           </motion.div>
         </div>

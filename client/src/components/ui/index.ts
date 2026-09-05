@@ -1,6 +1,8 @@
 export * from './Button';
 export * from './Input';
+export * from './Textarea';
 export * from './Select';
+export * from './RadioGroup';
 export * from './Modal';
 export * from './Card';
 export * from './Badge';
@@ -9,3 +11,4 @@ export * from './Tabs';
 export * from './Toast';
 export * from './Skeleton';
 export * from './EmptyState';
+export * from './Avatar';

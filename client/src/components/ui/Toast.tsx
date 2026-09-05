@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -27,10 +27,10 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 const DEFAULT_DURATION_MS = 4000;
 
 const VARIANT_CLASSES: Record<ToastVariant, string> = {
-  neutral: 'border-border bg-surface text-text',
-  success: 'border-success/30 bg-surface text-success',
-  warning: 'border-warning/30 bg-surface text-warning',
-  danger: 'border-danger/30 bg-surface text-danger',
+  neutral: 'border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)]',
+  success: 'border-transparent bg-[var(--status-success-bg)] text-[var(--status-success-fg)]',
+  warning: 'border-transparent bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]',
+  danger: 'border-transparent bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]',
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -61,7 +61,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function ToastViewport() {
   const ctx = useContext(ToastContext);
-  if (typeof document === 'undefined' || !ctx) return null;
+  const [mounted, setMounted] = useState(false);
+
+  // Defer the portal to a client-only commit: the first client render must
+  // match the server's (which renders nothing, since `document` doesn't exist
+  // there) or React logs a hydration mismatch.
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted || !ctx) return null;
 
   return createPortal(
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
@@ -73,13 +80,10 @@ function ToastViewport() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             role="status"
-            className={cn(
-              'w-80 rounded-md border px-4 py-3 shadow-lg',
-              VARIANT_CLASSES[toast.variant]
-            )}
+            className={cn('w-80 rounded-2xl border px-4 py-3 shadow-glow-sm', VARIANT_CLASSES[toast.variant])}
           >
             <p className="text-sm font-semibold">{toast.title}</p>
-            {toast.description && <p className="mt-1 text-sm opacity-90">{toast.description}</p>}
+            {toast.description && <p className="mt-1 text-xs opacity-90">{toast.description}</p>}
           </motion.div>
         ))}
       </AnimatePresence>

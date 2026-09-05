@@ -1,8 +1,22 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import employeeRoutes from './employee.routes';
+import userRoutes from './user.routes';
+import workingScheduleRoutes from './working-schedule.routes';
+import timeOffTypeRoutes from './time-off-type.routes';
+import salaryStructureRoutes from './salary-structure.routes';
+import salaryRuleRoutes from './salary-rule.routes';
+import contractRoutes from './contract.routes';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/employees', employeeRoutes);
+router.use('/users', userRoutes);
+router.use('/working-schedules', workingScheduleRoutes);
+router.use('/time-off-types', timeOffTypeRoutes);
+router.use('/salary-structures', salaryStructureRoutes);
+router.use('/salary-rules', salaryRuleRoutes);
+router.use('/contracts', contractRoutes);
 
 export default router;

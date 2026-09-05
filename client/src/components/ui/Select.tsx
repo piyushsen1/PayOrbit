@@ -21,7 +21,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={selectId} className="text-sm font-medium text-text">
+          <label
+            htmlFor={selectId}
+            className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]"
+          >
             {label}
           </label>
         )}
@@ -30,10 +33,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           id={selectId}
           aria-invalid={Boolean(error)}
           className={cn(
-            'h-10 rounded-md border border-border bg-surface px-3 text-base text-text',
-            'focus:outline-none focus:ring-2 focus:ring-primary-450 focus:border-primary-450',
-            'disabled:opacity-50 disabled:pointer-events-none',
-            error && 'border-danger focus:ring-danger focus:border-danger',
+            'h-10 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-sm text-[var(--text-primary)] outline-none transition',
+            'disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none',
+            error && 'border-[var(--status-danger-fg)]',
             className
           )}
           {...props}
@@ -49,7 +51,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p className="text-sm text-danger">{error}</p>}
+        {error && <p className="text-xs text-[var(--status-danger-fg)]">{error}</p>}
       </div>
     );
   }

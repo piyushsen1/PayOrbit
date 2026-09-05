@@ -38,7 +38,15 @@ module.exports = {
         danger: 'var(--color-danger)',
         info: 'var(--color-info)',
         bg: 'var(--color-bg)',
-        surface: 'var(--color-surface)',
+        surface: {
+          DEFAULT: 'var(--color-surface)',
+          muted: 'var(--color-surface-muted)',
+        },
+        cta: {
+          DEFAULT: 'var(--color-cta)',
+          hover: 'var(--color-cta-hover)',
+          active: 'var(--color-cta-active)',
+        },
         border: 'var(--color-border)',
         text: {
           DEFAULT: 'var(--color-text)',
@@ -48,6 +56,9 @@ module.exports = {
       },
       fontFamily: {
         sans: ['var(--font-family-sans)'],
+        // New design system's fonts (see tokens.css) — not yet applied anywhere.
+        body: ['var(--font-family-body)'],
+        mono: ['var(--font-family-mono)'],
       },
       fontSize: {
         xs: 'var(--font-size-xs)',
@@ -84,6 +95,11 @@ module.exports = {
         md: 'var(--shadow-md)',
         lg: 'var(--shadow-lg)',
         xl: 'var(--shadow-xl)',
+        // New design system's "glow" elevation scale (see tokens.css) — not yet applied anywhere.
+        'glow-xs': 'var(--shadow-glow-xs)',
+        'glow-sm': 'var(--shadow-glow-sm)',
+        'glow-md': 'var(--shadow-glow-md)',
+        'glow-lg': 'var(--shadow-glow-lg)',
       },
     },
   },

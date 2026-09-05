@@ -62,10 +62,11 @@ nav items/actions render per role.
   assignment, permission updates, system administration. Users must never be able to
   assign or elevate their own role.
 
-**Known gap**: `server/src/entities/User.ts`'s `UserRole` enum currently only has
-`user`/`admin` — a leftover from the auth boilerplate. Whoever picks up the first
-role-gated module should expand it to the five roles above (via a migration), update
-`roleGuard` call sites accordingly, and update this note once done.
+**Resolved**: `UserRole` now has all five values (`employee`, `hr_manager`,
+`hr_payroll_user`, `hr_payroll_manager`, `admin`) — migration
+`ExpandUserRoles1788595954472`, applied. Signup/seed default to `employee`.
+`roleGuard`/`canAccessOwnRecord` call sites are unchanged (still generic, take
+`UserRole[]`) — new modules should call them with the roles from the table above.
 
 ## Cross-cutting conventions
 

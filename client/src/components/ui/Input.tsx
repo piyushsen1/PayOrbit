@@ -15,7 +15,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-medium text-text">
+          <label
+            htmlFor={inputId}
+            className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]"
+          >
             {label}
           </label>
         )}
@@ -25,21 +28,20 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
           className={cn(
-            'h-10 rounded-md border border-border bg-surface px-3 text-base text-text',
-            'placeholder:text-text-subtle',
-            'focus:outline-none focus:ring-2 focus:ring-primary-450 focus:border-primary-450',
-            'disabled:opacity-50 disabled:pointer-events-none',
-            error && 'border-danger focus:ring-danger focus:border-danger',
+            'w-full rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-4 py-2.5 text-sm text-[var(--text-primary)] outline-none transition',
+            'placeholder:text-[var(--text-tertiary)]',
+            'disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none',
+            error && 'border-[var(--status-danger-fg)]',
             className
           )}
           {...props}
         />
         {error ? (
-          <p id={`${inputId}-error`} className="text-sm text-danger">
+          <p id={`${inputId}-error`} className="text-xs text-[var(--status-danger-fg)]">
             {error}
           </p>
         ) : hint ? (
-          <p id={`${inputId}-hint`} className="text-sm text-text-subtle">
+          <p id={`${inputId}-hint`} className="text-xs text-[var(--text-tertiary)]">
             {hint}
           </p>
         ) : null}

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { api, getStoredToken, setStoredToken } from '@/lib/api';
 
-export type AuthRole = 'user' | 'admin';
+export type AuthRole = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
 export interface AuthUser {
   id: string;
@@ -16,14 +16,13 @@ export interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  signup: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-interface SignupOrLoginResponse {
+interface LoginResponse {
   data: {
     token: string;
     user: { id: string; email: string; role: AuthRole; createdAt: string; updatedAt: string };
@@ -52,14 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const signup = useCallback(async (email: string, password: string) => {
-    const { data } = await api.post<SignupOrLoginResponse>('/auth/signup', { email, password });
-    setStoredToken(data.data.token);
-    setUser(data.data.user);
-  }, []);
-
   const login = useCallback(async (email: string, password: string) => {
-    const { data } = await api.post<SignupOrLoginResponse>('/auth/login', { email, password });
+    const { data } = await api.post<LoginResponse>('/auth/login', { email, password });
     setStoredToken(data.data.token);
     setUser(data.data.user);
   }, []);
@@ -69,9 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading, signup, login, logout }}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

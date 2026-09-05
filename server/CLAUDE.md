@@ -53,10 +53,9 @@ inventing a new one.
 ## Roles
 
 See root `CLAUDE.md` for the 5-role model (Employee, HR Manager, HR Payroll
-User, HR Payroll Manager, Admin) and the known gap: `UserRole` here still only
-has `user`/`admin`. Every new module's route guards should be written against
-the 5-role table from the start, even before the enum is expanded — don't gate
-new payroll/HR routes on `admin` as a stand-in.
+User, HR Payroll Manager, Admin). `UserRole` now has all five values — new
+module route guards should use `roleGuard(...)`/`canAccessOwnRecord(...)` with
+the actual roles from that table, not `admin` as a stand-in.
 
 ## Notes
 

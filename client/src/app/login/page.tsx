@@ -6,10 +6,10 @@ import { AxiosError } from 'axios';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { Container } from '@/components/layout/Container';
-import { Card, CardHeader, CardTitle, CardDescription, CardBody } from '@/components/ui/Card';
+import { Card, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import { useToast } from '@/components/ui/Toast';
 import { getErrorMessage } from '@/lib/errorMessages';
 
 const credentialsSchema = z.object({
@@ -22,8 +22,9 @@ interface ApiErrorBody {
 }
 
 export default function LoginPage() {
-  const { login, signup } = useAuth();
+  const { login } = useAuth();
   const router = useRouter();
+  const { showToast } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +32,7 @@ export default function LoginPage() {
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(mode: 'login' | 'signup', e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(undefined);
     setFieldError(undefined);
@@ -44,11 +45,7 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      if (mode === 'login') {
-        await login(parsed.data.email, parsed.data.password);
-      } else {
-        await signup(parsed.data.email, parsed.data.password);
-      }
+      await login(parsed.data.email, parsed.data.password);
       router.push('/');
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -60,67 +57,58 @@ export default function LoginPage() {
 
   return (
     <Container className="flex justify-center py-16">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Welcome</CardTitle>
-          <CardDescription>Sign in or create an account to continue.</CardDescription>
-        </CardHeader>
-        <CardBody>
-          <Tabs defaultValue="login">
-            <TabsList className="mb-4 w-full">
-              <TabsTrigger value="login">Log in</TabsTrigger>
-              <TabsTrigger value="signup">Sign up</TabsTrigger>
-            </TabsList>
+      <Card className="w-full max-w-sm shadow-glow-lg">
+        <CardBody className="flex flex-col gap-6 p-8">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+            HR Portal
+          </span>
 
-            <TabsContent value="login">
-              <form className="flex flex-col gap-4" onSubmit={(e) => handleSubmit('login', e)}>
-                <Input
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                />
-                <Input
-                  label="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  error={fieldError}
-                  autoComplete="current-password"
-                />
-                {formError && <p className="text-sm text-danger">{formError}</p>}
-                <Button type="submit" isLoading={isSubmitting}>
-                  Log in
-                </Button>
-              </form>
-            </TabsContent>
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Welcome back</h1>
+            <p className="text-sm text-[var(--text-secondary)]">Sign in to continue to your workspace.</p>
+          </div>
 
-            <TabsContent value="signup">
-              <form className="flex flex-col gap-4" onSubmit={(e) => handleSubmit('signup', e)}>
-                <Input
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                />
-                <Input
-                  label="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  error={fieldError}
-                  hint="At least 8 characters."
-                  autoComplete="new-password"
-                />
-                {formError && <p className="text-sm text-danger">{formError}</p>}
-                <Button type="submit" isLoading={isSubmitting}>
-                  Sign up
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+            <Input
+              label="Work Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+            <div className="flex flex-col gap-1.5">
+              <Input
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={fieldError}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => showToast({ title: 'Not available yet', description: 'Password reset is a planned enhancement.', variant: 'neutral' })}
+                className="self-end text-sm font-semibold text-[var(--text-link)] hover:text-[var(--primary-hover)] hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+            {formError && (
+              <p className="rounded-2xl bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]">
+                {formError}
+              </p>
+            )}
+            <Button type="submit" size="lg" isLoading={isSubmitting}>
+              Sign In
+            </Button>
+          </form>
+
+          <div className="flex flex-col gap-1 border-t border-[var(--border-subtle)] pt-4 text-center">
+            <p className="text-xs text-[var(--text-tertiary)]">Accounts are created by an administrator.</p>
+            <p className="text-xs text-[var(--text-tertiary)]">
+              After sign-in, only the modules and actions allowed by your assigned role are shown.
+            </p>
+          </div>
         </CardBody>
       </Card>
     </Container>

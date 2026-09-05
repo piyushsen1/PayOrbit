@@ -1,0 +1,47 @@
+import { Request, Response, NextFunction } from 'express';
+import * as salaryStructureService from '../services/salary-structure.service';
+
+export async function listSalaryStructuresHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const structures = await salaryStructureService.listSalaryStructures();
+    res.success(structures);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSalaryStructureHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const structure = await salaryStructureService.getSalaryStructure(req.params.id);
+    res.success(structure);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createSalaryStructureHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const structure = await salaryStructureService.createSalaryStructure(req.body);
+    res.success(structure, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateSalaryStructureHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const structure = await salaryStructureService.updateSalaryStructure(req.params.id, req.body);
+    res.success(structure);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteSalaryStructureHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    await salaryStructureService.deleteSalaryStructure(req.params.id);
+    res.success(null);
+  } catch (err) {
+    next(err);
+  }
+}

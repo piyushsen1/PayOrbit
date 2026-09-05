@@ -5,19 +5,49 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Container } from './Container';
 
+/** Per root CLAUDE.md roles table: HR Manager and every payroll/admin role above it. */
+const HR_PAYROLL_ROLES = ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'];
+
 export function Header() {
   const { user, isLoading, logout } = useAuth();
+  const hasHrAccess = !!user && HR_PAYROLL_ROLES.includes(user.role);
 
   return (
-    <header className="border-b border-border bg-surface">
+    <header className="border-b border-[var(--border-subtle)] bg-[var(--surface-card)]">
       <Container className="flex h-16 items-center justify-between">
-        <Link href="/" className="text-lg font-semibold text-text">
-          PayOrbit
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="text-lg font-semibold text-[var(--text-primary)]">
+            PayOrbit
+          </Link>
+          {!isLoading && hasHrAccess && (
+            <nav className="flex items-center gap-4">
+              <Link
+                href="/employees"
+                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
+              >
+                Employees
+              </Link>
+              <Link
+                href="/contracts"
+                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
+              >
+                Contracts
+              </Link>
+            </nav>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {!isLoading && user && (
             <>
-              <span className="text-sm text-text-muted">{user.email ?? user.id}</span>
+              {user.role === 'admin' && (
+                <Link
+                  href="/users"
+                  className="text-sm font-semibold text-[var(--text-link)] hover:text-[var(--primary-hover)] hover:underline"
+                >
+                  User Management
+                </Link>
+              )}
+              <span className="text-sm text-[var(--text-tertiary)]">{user.email ?? user.id}</span>
               <Button variant="outline" size="sm" onClick={logout}>
                 Log out
               </Button>

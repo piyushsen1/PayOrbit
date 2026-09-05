@@ -29,7 +29,7 @@ export async function signup(email: string, password: string) {
   }
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  const user = repo.create({ email, passwordHash, role: UserRole.USER });
+  const user = repo.create({ email, passwordHash, role: UserRole.EMPLOYEE });
   await repo.save(user);
 
   return { token: signToken(user), user: toPublicUser(user) };

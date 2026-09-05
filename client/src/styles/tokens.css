@@ -1,11 +1,10 @@
 /**
- * Design tokens. Values below are the dataviz skill's validated reference
- * palette (see references/palette.md) — real values get swapped in from the
- * brand mock on day 1, but the variable NAMES here are what every component
- * is written against, so the swap is a one-file edit.
+ * Design tokens. Values below are PayOrbit's actual brand palette (warm
+ * gold/cream/navy/slate) — the variable NAMES here are what every component
+ * is written against, so a future palette swap is still a one-file edit.
  */
 :root {
-  /* ---- Neutral scale (warm gray, matches the chart chrome ink) ---- */
+  /* ---- Neutral scale (kept for chart chrome / dense-UI grays; not brand-colored) ---- */
   --color-gray-50: #f9f9f7;
   --color-gray-100: #f2f1ed;
   --color-gray-200: #e1e0d9;
@@ -17,35 +16,41 @@
   --color-gray-800: #34332f;
   --color-gray-900: #0b0b0b;
 
-  /* ---- Primary scale (sequential blue ramp) ---- */
-  --color-primary-100: #cde2fb;
-  --color-primary-150: #b7d3f6;
-  --color-primary-200: #9ec5f4;
-  --color-primary-250: #86b6ef;
-  --color-primary-300: #6da7ec;
-  --color-primary-350: #5598e7;
-  --color-primary-400: #3987e5;
-  --color-primary-450: #2a78d6;
-  --color-primary-500: #256abf;
-  --color-primary-550: #1c5cab;
-  --color-primary-600: #184f95;
-  --color-primary-650: #104281;
-  --color-primary-700: #0d366b;
+  /* ---- Primary/accent scale — warm gold, used for focus rings, links, interactive accents ---- */
+  --color-primary-100: #f6ecd9;
+  --color-primary-150: #f1e3c8;
+  --color-primary-200: #ecd9b6;
+  --color-primary-250: #e7d0a5;
+  --color-primary-300: #e2c793;
+  --color-primary-350: #dec384;
+  --color-primary-400: #e0b676;
+  --color-primary-450: #daa464; /* accent gold — focus rings, link color, avatar border */
+  --color-primary-500: #cf9959;
+  --color-primary-550: #c4904e; /* darker gold — link/button hover */
+  --color-primary-600: #b17f42;
+  --color-primary-650: #916636;
+  --color-primary-700: #714f2a;
 
   /* ---- Semantic status (fixed — never themed, never reused for series) ---- */
   --color-success: #0ca30c;
   --color-warning: #fab219;
   --color-serious: #ec835a;
-  --color-danger: #d03b3b;
+  --color-danger: #ef4444; /* Tailwind red-500 — matches the app-wide error accent */
   --color-info: var(--color-primary-450);
 
+  /* ---- CTA (primary button) fill — pale cream, distinct from the gold accent used for links/focus ---- */
+  --color-cta: #e8ddb4;
+  --color-cta-hover: #d6c99d;
+  --color-cta-active: #c4b88c;
+
   /* ---- Surfaces & ink ---- */
-  --color-bg: var(--color-gray-50);
-  --color-surface: #fcfcfb;
-  --color-border: var(--color-gray-200);
-  --color-text: var(--color-gray-900);
-  --color-text-muted: var(--color-gray-700);
-  --color-text-subtle: var(--color-gray-500);
+  --color-bg: #e8ddb4;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f0e4;
+  --color-border: #dec384;
+  --color-text: #3d4460;
+  --color-text-muted: #767f9e;
+  --color-text-subtle: #9ba2bc;
 
   /* ---- Categorical chart series (fixed order — never cycled/reassigned) ---- */
   --chart-series-1: #2a78d6; /* blue */
@@ -58,7 +63,7 @@
   --chart-series-8: #e34948; /* red */
 
   /* ---- Type scale ---- */
-  --font-family-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-family-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;
@@ -91,8 +96,8 @@
   /* ---- Radius scale ---- */
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  --radius-lg: 0.5rem; /* inputs/buttons, ~8px */
+  --radius-xl: 1rem; /* cards */
   --radius-full: 9999px;
 
   /* ---- Shadow scale ---- */
@@ -100,4 +105,80 @@
   --shadow-md: 0 4px 8px rgba(11, 11, 11, 0.08);
   --shadow-lg: 0 8px 24px rgba(11, 11, 11, 0.1);
   --shadow-xl: 0 16px 48px rgba(11, 11, 11, 0.12);
+
+  /* =====================================================================
+   * New design system tokens — added on request, NOT yet wired into any
+   * component or page. Nothing above this line was changed. When asked to
+   * apply this system, these are the names to reference (arbitrary-value
+   * Tailwind syntax, e.g. bg-[var(--surface-card)], per the spec's own
+   * usage examples) rather than the legacy --color-* tokens above.
+   * ===================================================================== */
+
+  /* ---- Color tokens (light / default) ---- */
+  --primary: #2c5ead;
+  --primary-hover: #1591dc;
+  --primary-soft: #c4e2f5;
+  --surface-page: #f8fbff;
+  --surface-card: #ffffff;
+  --surface-sunken: #eef4ff;
+  --text-primary: #102a43;
+  --text-secondary: #334e68;
+  --text-tertiary: #627d98;
+  --text-on-primary: #ffffff;
+  --text-link: #1591dc;
+  --border-subtle: #d9e2ec;
+  --border-default: #cad6e2;
+  --border-focus: #2c5ead;
+
+  /* ---- Semantic/status pairs (fg on tinted bg — same value in both themes) ---- */
+  --status-success-fg: #047857;
+  --status-success-bg: #d1fae5;
+  --status-warning-fg: #92400e;
+  --status-warning-bg: #fef3c7;
+  --status-danger-fg: #b91c1c;
+  --status-danger-bg: #fee2e2;
+  --status-info-fg: #0e7490;
+  --status-info-bg: #dbeafe;
+  --status-teal-fg: #0f766e;
+  --status-teal-bg: #ccfbf1;
+
+  /* ---- Typography ---- */
+  --font-family-body: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  /* Font files for Plus Jakarta Sans / JetBrains Mono are not loaded yet — only
+     the CSS variable is defined; both fall back to the listed system stacks
+     until a font source (Google Fonts link, self-hosted @font-face, etc.) is added. */
+
+  /* ---- Elevation ("glow" family — all built on the primary hue) ---- */
+  --shadow-glow-xs: 0 2px 8px rgba(21, 145, 220, 0.12);
+  --shadow-glow-md: 0 8px 24px rgba(21, 145, 220, 0.1);
+  --shadow-glow-sm: 0 16px 40px rgba(21, 145, 220, 0.15);
+  --shadow-glow-lg: 0 24px 60px rgba(21, 145, 220, 0.18);
+}
+
+/* ---- Dark overrides — primary/status colors stay the same, only surfaces/text/border shift ---- */
+[data-theme='dark'] {
+  --surface-page: #0b1220;
+  --surface-card: #111827;
+  --surface-sunken: #1f2937;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #cbd5e1;
+  --text-link: #93c5fd;
+  --border-subtle: #334155;
+  --border-default: #1f2937;
+  --border-focus: #93c5fd;
+}
+
+/* Monospace treatment for numbers/codes/tags, per the new design system's typography scale. */
+.num {
+  font-family: var(--font-family-mono);
+}
+
+/* Global focus-visible ring, per the new design system's interaction-state spec. */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

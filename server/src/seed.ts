@@ -3,10 +3,24 @@ import bcrypt from 'bcrypt';
 import { faker } from '@faker-js/faker';
 import { AppDataSource } from './config/data-source';
 import { User, UserRole } from './entities/User';
+import { Employee } from './entities/Employee';
+import { WorkingSchedule } from './entities/WorkingSchedule';
+import { DayOfWeek, WorkingScheduleDay } from './entities/WorkingScheduleDay';
+import { TimeOffType, TimeOffUnit } from './entities/TimeOffType';
+import { SalaryStructure } from './entities/SalaryStructure';
+import { SalaryRule, SalaryRuleCategory, SalaryRuleComputationMethod } from './entities/SalaryRule';
 
 const SALT_ROUNDS = 10;
 const USERS_TO_SEED = 10;
 const SEED_PASSWORD = 'Password123!';
+
+/** One linked Employee+User pair per role, for demoing the User Management screen. */
+const DEMO_ACCOUNTS: Array<{ fullName: string; jobPosition: string; department: string; role: UserRole }> = [
+  { fullName: 'Aarav Mehta', jobPosition: 'Payroll Specialist', department: 'Finance', role: UserRole.HR_PAYROLL_USER },
+  { fullName: 'Maya Shah', jobPosition: 'HR Officer', department: 'HR', role: UserRole.HR_MANAGER },
+  { fullName: 'Rohan Patel', jobPosition: 'Developer', department: 'Engineering', role: UserRole.EMPLOYEE },
+  { fullName: 'Nisha Rao', jobPosition: 'Payroll Manager', department: 'Finance', role: UserRole.HR_PAYROLL_MANAGER },
+];
 
 /**
  * Idempotent-ish dev seed: run against a fresh, migrated database. Goes
@@ -16,8 +30,76 @@ const SEED_PASSWORD = 'Password123!';
 async function seed() {
   await AppDataSource.initialize();
   const userRepository = AppDataSource.getRepository(User);
+  const employeeRepository = AppDataSource.getRepository(Employee);
+  const workingScheduleRepository = AppDataSource.getRepository(WorkingSchedule);
+  const timeOffTypeRepository = AppDataSource.getRepository(TimeOffType);
+  const salaryStructureRepository = AppDataSource.getRepository(SalaryStructure);
+  const salaryRuleRepository = AppDataSource.getRepository(SalaryRule);
 
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, SALT_ROUNDS);
+
+  const weekdays = [DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY];
+  await workingScheduleRepository.save(
+    workingScheduleRepository.create({
+      name: 'Standard 40h/Week',
+      company: 'PayOrbit',
+      timezone: 'UTC',
+      weeklyHours: '40.00',
+      days: weekdays.map((dayOfWeek) =>
+        Object.assign(new WorkingScheduleDay(), { dayOfWeek, startTime: '09:00', endTime: '18:00', breakMinutes: 60 })
+      ),
+    })
+  );
+  console.log('Seeded 1 working schedule (Standard 40h/Week).');
+
+  const DEMO_TIME_OFF_TYPES: Array<{
+    name: string;
+    unit: TimeOffUnit;
+    allocationRequired: boolean;
+    approvalRole: UserRole;
+    affectsPayroll: boolean;
+    color: string;
+  }> = [
+    { name: 'Paid Time Off', unit: TimeOffUnit.DAYS, allocationRequired: true, approvalRole: UserRole.HR_MANAGER, affectsPayroll: true, color: '#3B82F6' },
+    { name: 'Sick Leave', unit: TimeOffUnit.DAYS, allocationRequired: false, approvalRole: UserRole.HR_MANAGER, affectsPayroll: true, color: '#EF4444' },
+    { name: 'Unpaid Leave', unit: TimeOffUnit.DAYS, allocationRequired: false, approvalRole: UserRole.HR_PAYROLL_MANAGER, affectsPayroll: false, color: '#6B7280' },
+  ];
+  await timeOffTypeRepository.save(DEMO_TIME_OFF_TYPES.map((type) => timeOffTypeRepository.create(type)));
+  console.log(`Seeded ${DEMO_TIME_OFF_TYPES.length} time off types.`);
+
+  const standardStructure = await salaryStructureRepository.save(
+    salaryStructureRepository.create({ name: 'Standard Structure', active: true })
+  );
+  await salaryRuleRepository.save([
+    salaryRuleRepository.create({
+      name: 'Basic Salary',
+      code: 'BASIC',
+      category: SalaryRuleCategory.BASIC,
+      sequence: 10,
+      salaryStructureId: standardStructure.id,
+      computationMethod: SalaryRuleComputationMethod.FIXED,
+      value: '30000.00',
+    }),
+    salaryRuleRepository.create({
+      name: 'House Rent Allowance',
+      code: 'HRA',
+      category: SalaryRuleCategory.ALLOWANCE,
+      sequence: 20,
+      salaryStructureId: standardStructure.id,
+      computationMethod: SalaryRuleComputationMethod.PERCENTAGE,
+      value: '40.00',
+    }),
+    salaryRuleRepository.create({
+      name: 'Income Tax',
+      code: 'TAX',
+      category: SalaryRuleCategory.DEDUCTION,
+      sequence: 30,
+      salaryStructureId: standardStructure.id,
+      computationMethod: SalaryRuleComputationMethod.PERCENTAGE,
+      value: '10.00',
+    }),
+  ]);
+  console.log('Seeded 1 salary structure (Standard Structure) with 3 rules.');
 
   const admin = userRepository.create({
     email: 'admin@example.com',
@@ -25,11 +107,32 @@ async function seed() {
     role: UserRole.ADMIN,
   });
 
+  for (const account of DEMO_ACCOUNTS) {
+    const workEmail = `${account.fullName.toLowerCase().replace(/\s+/g, '.')}@company.com`;
+    const employee = await employeeRepository.save(
+      employeeRepository.create({
+        fullName: account.fullName,
+        workEmail,
+        jobPosition: account.jobPosition,
+        department: account.department,
+      })
+    );
+    await userRepository.save(
+      userRepository.create({
+        email: workEmail,
+        passwordHash,
+        role: account.role,
+        employeeId: employee.id,
+      })
+    );
+  }
+  console.log(`Seeded ${DEMO_ACCOUNTS.length} employees with linked user accounts (one per role).`);
+
   const users = Array.from({ length: USERS_TO_SEED }, () =>
     userRepository.create({
       email: faker.internet.email().toLowerCase(),
       passwordHash,
-      role: UserRole.USER,
+      role: UserRole.EMPLOYEE,
     })
   );
 

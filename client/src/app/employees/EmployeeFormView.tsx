@@ -43,6 +43,7 @@ interface Employee {
   dateOfBirth: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  bankAccountNumber: string | null;
 }
 
 interface WorkingSchedule {
@@ -78,6 +79,7 @@ interface FormState {
   dateOfBirth: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
+  bankAccountNumber: string;
 }
 
 function emptyForm(): FormState {
@@ -97,6 +99,7 @@ function emptyForm(): FormState {
     dateOfBirth: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
+    bankAccountNumber: "",
   };
 }
 
@@ -117,6 +120,7 @@ function toFormState(employee: Employee): FormState {
     dateOfBirth: employee.dateOfBirth ?? "",
     emergencyContactName: employee.emergencyContactName ?? "",
     emergencyContactPhone: employee.emergencyContactPhone ?? "",
+    bankAccountNumber: employee.bankAccountNumber ?? "",
   };
 }
 
@@ -137,6 +141,7 @@ function buildPayload(form: FormState) {
     dateOfBirth: form.dateOfBirth || null,
     emergencyContactName: form.emergencyContactName || null,
     emergencyContactPhone: form.emergencyContactPhone || null,
+    bankAccountNumber: form.bankAccountNumber || null,
   };
 }
 
@@ -162,6 +167,8 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contractsCount, setContractsCount] = useState(0);
+  const [timeOffCount, setTimeOffCount] = useState(0);
+  const [attendanceCount, setAttendanceCount] = useState(0);
 
   const canAccess = !!user && EMPLOYEE_MODULE_ROLES.includes(user.role);
 
@@ -185,10 +192,20 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
           setEmployee(data.data);
           setForm(toFormState(data.data));
 
-          const contractsRes = await api
-            .get<{ data: unknown[] }>("/contracts", { params: { employeeId } })
-            .catch(() => ({ data: { data: [] as unknown[] } }));
+          const [contractsRes, timeOffRes, attendanceRes] = await Promise.all([
+            api
+              .get<{ data: unknown[] }>("/contracts", { params: { employeeId } })
+              .catch(() => ({ data: { data: [] as unknown[] } })),
+            api
+              .get<{ data: unknown[] }>("/time-off-requests", { params: { employeeId } })
+              .catch(() => ({ data: { data: [] as unknown[] } })),
+            api
+              .get<{ data: unknown[] }>("/attendance", { params: { employeeId } })
+              .catch(() => ({ data: { data: [] as unknown[] } })),
+          ]);
           setContractsCount(contractsRes.data.data.length);
+          setTimeOffCount(timeOffRes.data.data.length);
+          setAttendanceCount(attendanceRes.data.data.length);
         } catch (err) {
           const axiosErr = err as AxiosError<ApiErrorBody>;
           if (axiosErr.response?.status === 404) {
@@ -348,10 +365,11 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
               <Button
                 variant="outline"
                 size="sm"
-                title="Available once the Time Off module ships"
-                disabled
+                onClick={() =>
+                  router.push(`/time-off-requests?employeeId=${employeeId}`)
+                }
               >
-                Time Off 0
+                Time Off {timeOffCount}
               </Button>
               <Button
                 variant="outline"
@@ -365,10 +383,11 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
               <Button
                 variant="outline"
                 size="sm"
-                title="Available once the Attendance module ships"
-                disabled
+                onClick={() =>
+                  router.push(`/attendance?employeeId=${employeeId}`)
+                }
               >
-                Attendance 0
+                Attendance {attendanceCount}
               </Button>
             </div>
             {!isEditing ? (
@@ -563,6 +582,15 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   disabled={readOnly}
                   onChange={(e) =>
                     setField("emergencyContactPhone", e.target.value)
+                  }
+                />
+                <Input
+                  label="Bank Account Number"
+                  value={form.bankAccountNumber}
+                  disabled={readOnly}
+                  hint="Required for payroll — a missing value surfaces as a pay-run warning."
+                  onChange={(e) =>
+                    setField("bankAccountNumber", e.target.value)
                   }
                 />
               </div>

@@ -28,6 +28,17 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** How many minutes late a check-in is allowed to be before it's flagged `late` instead of `present`. */
+const LATE_GRACE_MINUTES = 15;
+
+async function getScheduledDay(employee: Employee | null | undefined, date: string) {
+  const workingScheduleId = employee?.workingScheduleId;
+  if (!workingScheduleId) return null;
+  return workingScheduleDayRepository().findOne({
+    where: { workingScheduleId, dayOfWeek: dayOfWeekFor(date) },
+  });
+}
+
 /** Worked hours from check-in/out, and overtime against the employee's Working Schedule for that day — both derived, never stored. */
 async function withWorkedHoursAndOvertime(attendance: Attendance, employee?: Employee | null) {
   let workedHours = 0;
@@ -36,16 +47,11 @@ async function withWorkedHoursAndOvertime(attendance: Attendance, employee?: Emp
   }
 
   let expectedHours: number | null = null;
-  const workingScheduleId = employee?.workingScheduleId;
-  if (workingScheduleId) {
-    const scheduleDay = await workingScheduleDayRepository().findOne({
-      where: { workingScheduleId, dayOfWeek: dayOfWeekFor(attendance.date) },
-    });
-    if (scheduleDay) {
-      const [startH, startM] = scheduleDay.startTime.split(':').map(Number);
-      const [endH, endM] = scheduleDay.endTime.split(':').map(Number);
-      expectedHours = Math.max(endH * 60 + endM - (startH * 60 + startM) - scheduleDay.breakMinutes, 0) / 60;
-    }
+  const scheduleDay = await getScheduledDay(employee, attendance.date);
+  if (scheduleDay) {
+    const [startH, startM] = scheduleDay.startTime.split(':').map(Number);
+    const [endH, endM] = scheduleDay.endTime.split(':').map(Number);
+    expectedHours = Math.max(endH * 60 + endM - (startH * 60 + startM) - scheduleDay.breakMinutes, 0) / 60;
   }
 
   const overtime = expectedHours != null ? Math.max(workedHours - expectedHours, 0) : 0;
@@ -57,6 +63,14 @@ async function withWorkedHoursAndOvertime(attendance: Attendance, employee?: Emp
   };
 }
 
+/** True if `checkInTime` is more than LATE_GRACE_MINUTES after the scheduled start for that day (UTC time-of-day compare). */
+function isLateCheckIn(checkInTime: Date, scheduleDay: WorkingScheduleDay): boolean {
+  const [startH, startM] = scheduleDay.startTime.split(':').map(Number);
+  const scheduledMinutes = startH * 60 + startM;
+  const actualMinutes = checkInTime.getUTCHours() * 60 + checkInTime.getUTCMinutes();
+  return actualMinutes > scheduledMinutes + LATE_GRACE_MINUTES;
+}
+
 export interface AttendanceInput {
   employeeId: string;
   date: string;
@@ -64,6 +78,29 @@ export interface AttendanceInput {
   checkOut?: string | null;
   status?: AttendanceStatus;
   notes?: string | null;
+}
+
+/** Aggregate present/late/absent counts and total overtime hours for a date range (and optional employee scope) — used by the Payroll Dashboard's attendance panel. */
+export async function getOvertimeRollup(filter: { periodStart: string; periodEnd: string; employeeIds?: string[] }) {
+  const qb = attendanceRepository()
+    .createQueryBuilder('attendance')
+    .where('attendance.date BETWEEN :periodStart AND :periodEnd', {
+      periodStart: filter.periodStart,
+      periodEnd: filter.periodEnd,
+    });
+  if (filter.employeeIds) qb.andWhere('attendance.employee_id IN (:...employeeIds)', { employeeIds: filter.employeeIds });
+  qb.leftJoinAndSelect('attendance.employee', 'employee');
+
+  const records = await qb.getMany();
+  const withOvertime = await Promise.all(records.map((r) => withWorkedHoursAndOvertime(r, r.employee)));
+
+  return {
+    present: records.filter((r) => r.status === AttendanceStatus.PRESENT).length,
+    late: records.filter((r) => r.status === AttendanceStatus.LATE).length,
+    absent: records.filter((r) => r.status === AttendanceStatus.ABSENT).length,
+    total: records.length,
+    totalOvertimeHours: Number(withOvertime.reduce((sum, r) => sum + r.overtime, 0).toFixed(2)),
+  };
 }
 
 export async function listAttendance(filter?: { employeeId?: string; date?: string }) {
@@ -143,13 +180,16 @@ export async function checkIn(employeeId: string) {
   }
 
   if (!record) {
-    record = repo.create({ employeeId, date, status: AttendanceStatus.PRESENT });
+    record = repo.create({ employeeId, date });
   }
-  record.checkIn = new Date();
-  record.status = AttendanceStatus.PRESENT;
+  const employee = await employeeRepository().findOne({ where: { id: employeeId } });
+  const checkInTime = new Date();
+  const scheduleDay = await getScheduledDay(employee, date);
+
+  record.checkIn = checkInTime;
+  record.status = scheduleDay && isLateCheckIn(checkInTime, scheduleDay) ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
   const saved = await repo.save(record);
 
-  const employee = await employeeRepository().findOne({ where: { id: employeeId } });
   return withWorkedHoursAndOvertime(saved, employee);
 }
 

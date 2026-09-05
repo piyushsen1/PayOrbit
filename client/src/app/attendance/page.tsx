@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
@@ -48,14 +48,30 @@ function formatTime(iso: string | null): string {
 }
 
 export default function AttendancePage() {
+  return (
+    <Suspense
+      fallback={
+        <Container className="flex flex-col gap-3 py-10">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-64 w-full" />
+        </Container>
+      }
+    >
+      <AttendancePageContent />
+    </Suspense>
+  );
+}
+
+function AttendancePageContent() {
   const { user, isLoading: authLoading } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [records, setRecords] = useState<Attendance[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [employeeFilter, setEmployeeFilter] = useState('');
+  const [employeeFilter, setEmployeeFilter] = useState(searchParams.get('employeeId') ?? '');
   const [todayOnly, setTodayOnly] = useState(false);
 
   const canAccess = !!user && ATTENDANCE_MODULE_ROLES.includes(user.role);

@@ -1,12 +1,11 @@
 import { AppDataSource } from '../config/data-source';
-import { Employee } from '../entities/Employee';
-import { Attendance, AttendanceStatus } from '../entities/Attendance';
+import { Employee, EmployeeType } from '../entities/Employee';
 import { TimeOffRequest, TimeOffRequestStatus } from '../entities/TimeOffRequest';
 import { Payslip, PayslipStatus } from '../entities/Payslip';
 import { PayRun } from '../entities/PayRun';
+import { getOvertimeRollup } from './attendance.service';
 
 const employeeRepository = () => AppDataSource.getRepository(Employee);
-const attendanceRepository = () => AppDataSource.getRepository(Attendance);
 const timeOffRequestRepository = () => AppDataSource.getRepository(TimeOffRequest);
 const payslipRepository = () => AppDataSource.getRepository(Payslip);
 const payRunRepository = () => AppDataSource.getRepository(PayRun);
@@ -16,14 +15,16 @@ export interface DashboardFilter {
   periodEnd: string;
   department?: string;
   company?: string;
+  employeeType?: EmployeeType;
 }
 
-/** Employee ids matching the department/company filters, or undefined if neither filter is set (meaning "no restriction"). */
+/** Employee ids matching the department/company/employeeType filters, or undefined if none are set (meaning "no restriction"). */
 async function filteredEmployeeIds(filter: DashboardFilter): Promise<string[] | undefined> {
-  if (!filter.department && !filter.company) return undefined;
+  if (!filter.department && !filter.company && !filter.employeeType) return undefined;
   const qb = employeeRepository().createQueryBuilder('employee').select('employee.id', 'id');
   if (filter.department) qb.andWhere('employee.department = :department', { department: filter.department });
   if (filter.company) qb.andWhere('employee.company = :company', { company: filter.company });
+  if (filter.employeeType) qb.andWhere('employee.employee_type = :employeeType', { employeeType: filter.employeeType });
   const rows = await qb.getRawMany<{ id: string }>();
   return rows.map((r) => r.id);
 }
@@ -43,6 +44,7 @@ export async function getDashboard(filter: DashboardFilter) {
   const paidPayslips = payslipsInPeriod.filter((p) => p.status === PayslipStatus.PAID);
   const totalNetSalaryPaid = paidPayslips.reduce((sum, p) => sum + Number(p.netTotal ?? 0), 0);
   const payslipsGenerated = payslipsInPeriod.length;
+  const averageNetSalary = paidPayslips.length ? Number((totalNetSalaryPaid / paidPayslips.length).toFixed(2)) : 0;
 
   const payslipStatusBreakdown = [PayslipStatus.DRAFT, PayslipStatus.VALIDATED, PayslipStatus.PAID].map((status) => ({
     status,
@@ -99,22 +101,21 @@ export async function getDashboard(filter: DashboardFilter) {
     approvedDays: Number(approvedTimeOffDays.toFixed(2)),
   };
 
-  // -- Attendance overview (records within the period) --
-  const attendanceQb = attendanceRepository()
-    .createQueryBuilder('attendance')
-    .where('attendance.date BETWEEN :periodStart AND :periodEnd', {
-      periodStart: filter.periodStart,
-      periodEnd: filter.periodEnd,
-    });
-  if (employeeIds) attendanceQb.andWhere('attendance.employee_id IN (:...employeeIds)', { employeeIds });
-  const attendanceRecords = await attendanceQb.getMany();
-  const presentCount = attendanceRecords.filter((a) => a.status === AttendanceStatus.PRESENT).length;
-  const absentCount = attendanceRecords.filter((a) => a.status === AttendanceStatus.ABSENT).length;
+  // -- Attendance overview (records within the period), incl. late count and total overtime rollup --
+  const overtimeRollup = await getOvertimeRollup({
+    periodStart: filter.periodStart,
+    periodEnd: filter.periodEnd,
+    employeeIds,
+  });
   const attendanceOverview = {
-    present: presentCount,
-    absent: absentCount,
-    total: attendanceRecords.length,
-    healthPct: attendanceRecords.length ? Number(((presentCount / attendanceRecords.length) * 100).toFixed(1)) : null,
+    present: overtimeRollup.present,
+    late: overtimeRollup.late,
+    absent: overtimeRollup.absent,
+    total: overtimeRollup.total,
+    healthPct: overtimeRollup.total
+      ? Number((((overtimeRollup.present + overtimeRollup.late) / overtimeRollup.total) * 100).toFixed(1))
+      : null,
+    totalOvertimeHours: overtimeRollup.totalOvertimeHours,
   };
 
   // -- Department overview (headcount, respecting the department/company filter) --
@@ -133,6 +134,7 @@ export async function getDashboard(filter: DashboardFilter) {
     filter,
     kpis: {
       totalNetSalaryPaid: Number(totalNetSalaryPaid.toFixed(2)),
+      averageNetSalary,
       payslipsGenerated,
       approvedTimeOffDays: timeOffOverview.approvedDays,
       attendanceHealthPct: attendanceOverview.healthPct,

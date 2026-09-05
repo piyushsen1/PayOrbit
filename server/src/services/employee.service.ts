@@ -1,5 +1,5 @@
 import { AppDataSource } from '../config/data-source';
-import { Employee, EmployeeStatus } from '../entities/Employee';
+import { Employee, EmployeeStatus, EmployeeType } from '../entities/Employee';
 import { WorkingSchedule } from '../entities/WorkingSchedule';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
@@ -13,6 +13,7 @@ export interface EmployeeInput {
   jobPosition?: string | null;
   department?: string | null;
   status?: EmployeeStatus;
+  employeeType?: EmployeeType;
   managerId?: string | null;
   workingScheduleId?: string | null;
   workLocation?: string | null;
@@ -23,6 +24,7 @@ export interface EmployeeInput {
   dateOfBirth?: string | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
+  bankAccountNumber?: string | null;
 }
 
 async function assertManagerExists(managerId: string) {
@@ -61,6 +63,7 @@ export async function createEmployee(input: EmployeeInput) {
     workEmail: input.workEmail,
     jobPosition: input.jobPosition ?? null,
     department: input.department ?? null,
+    employeeType: input.employeeType ?? EmployeeType.FULL_TIME,
     managerId: input.managerId ?? null,
     workingScheduleId: input.workingScheduleId ?? null,
     workLocation: input.workLocation ?? null,
@@ -71,6 +74,7 @@ export async function createEmployee(input: EmployeeInput) {
     dateOfBirth: input.dateOfBirth ?? null,
     emergencyContactName: input.emergencyContactName ?? null,
     emergencyContactPhone: input.emergencyContactPhone ?? null,
+    bankAccountNumber: input.bankAccountNumber ?? null,
   });
   return repo.save(employee);
 }
@@ -99,6 +103,7 @@ export async function updateEmployee(id: string, input: Partial<EmployeeInput>) 
   if (input.jobPosition !== undefined) employee.jobPosition = input.jobPosition;
   if (input.department !== undefined) employee.department = input.department;
   if (input.status !== undefined) employee.status = input.status;
+  if (input.employeeType !== undefined) employee.employeeType = input.employeeType;
   if (input.workLocation !== undefined) employee.workLocation = input.workLocation;
   if (input.company !== undefined) employee.company = input.company;
   if (input.phone !== undefined) employee.phone = input.phone;
@@ -107,6 +112,7 @@ export async function updateEmployee(id: string, input: Partial<EmployeeInput>) 
   if (input.dateOfBirth !== undefined) employee.dateOfBirth = input.dateOfBirth;
   if (input.emergencyContactName !== undefined) employee.emergencyContactName = input.emergencyContactName;
   if (input.emergencyContactPhone !== undefined) employee.emergencyContactPhone = input.emergencyContactPhone;
+  if (input.bankAccountNumber !== undefined) employee.bankAccountNumber = input.bankAccountNumber;
 
   return repo.save(employee);
 }

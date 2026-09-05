@@ -10,6 +10,15 @@ export enum PayslipStatus {
   PAID = 'paid',
 }
 
+/** Discrete codes for each warning `computeOnePayslip` can raise — lets the client filter/style by category instead of parsing `warning` text. */
+export enum PayslipWarningType {
+  MISSING_BANK_DETAILS = 'missing_bank_details',
+  NO_ACTIVE_CONTRACT = 'no_active_contract',
+  CONTRACT_DELETED = 'contract_deleted',
+  NO_ATTENDANCE = 'no_attendance',
+  FORMULA_ERROR = 'formula_error',
+}
+
 /**
  * One employee's computed salary for one PayRun. `contractId` is resolved
  * once at PayRun creation (the *applicable* contract overlapping the period,
@@ -60,6 +69,10 @@ export class Payslip {
 
   @Column({ type: 'text', nullable: true })
   warning!: string | null;
+
+  /** Machine-readable codes for the warnings folded into `warning`'s text, e.g. `['missing_bank_details','no_attendance']`. */
+  @Column({ type: 'simple-array', name: 'warning_types', nullable: true })
+  warningTypes!: PayslipWarningType[] | null;
 
   @Column({ type: 'enum', enum: PayslipStatus, default: PayslipStatus.DRAFT })
   status!: PayslipStatus;

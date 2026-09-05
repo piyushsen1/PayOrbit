@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
@@ -40,14 +40,30 @@ interface ApiErrorBody {
 }
 
 export default function TimeOffRequestsPage() {
+  return (
+    <Suspense
+      fallback={
+        <Container className="flex flex-col gap-3 py-10">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-64 w-full" />
+        </Container>
+      }
+    >
+      <TimeOffRequestsPageContent />
+    </Suspense>
+  );
+}
+
+function TimeOffRequestsPageContent() {
   const { user, isLoading: authLoading } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [employeeFilter, setEmployeeFilter] = useState('');
+  const [employeeFilter, setEmployeeFilter] = useState(searchParams.get('employeeId') ?? '');
   const [decidingId, setDecidingId] = useState<string | null>(null);
 
   const isHr = !!user && HR_ROLES.includes(user.role);

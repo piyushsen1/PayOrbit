@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
+import { EmployeeType } from '../entities/Employee';
 import { getDashboardHandler } from '../controllers/dashboard.controller';
 
 const router = Router();
@@ -17,6 +18,7 @@ const querySchema = z.object({
     periodEnd: z.string().date().optional(),
     department: z.string().min(1).optional(),
     company: z.string().min(1).optional(),
+    employeeType: z.nativeEnum(EmployeeType).optional(),
   }),
 });
 
@@ -49,6 +51,11 @@ const querySchema = z.object({
  *         name: company
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: employeeType
+ *         schema:
+ *           type: string
+ *           enum: [full_time, part_time, contract, intern]
  *     responses:
  *       200:
  *         description: Dashboard payload — { kpis, charts, panels, warningCount }.

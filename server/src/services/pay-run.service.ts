@@ -1,6 +1,6 @@
 import { AppDataSource } from '../config/data-source';
 import { PayRun, PayRunStatus } from '../entities/PayRun';
-import { Payslip, PayslipStatus } from '../entities/Payslip';
+import { Payslip, PayslipStatus, PayslipWarningType } from '../entities/Payslip';
 import { PayslipLine } from '../entities/PayslipLine';
 import { SalaryStructure } from '../entities/SalaryStructure';
 import { SalaryRule, SalaryRuleCategory, SalaryRuleComputationMethod } from '../entities/SalaryRule';
@@ -11,6 +11,7 @@ import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
 import { generatePayslipPdf } from '../utils/payslip-pdf';
 import { isEmailConfigured, sendPayslipEmail } from './email.service';
+import { evaluateFormula, type FormulaContext } from '../utils/formula-evaluator';
 
 const payRunRepository = () => AppDataSource.getRepository(PayRun);
 const payslipRepository = () => AppDataSource.getRepository(Payslip);
@@ -60,7 +61,7 @@ export async function getPayRun(id: string) {
     relations: ['payslips', 'payslips.employee', 'salaryStructure'],
   });
   if (!payRun) throw new AppError(ErrorCodes.NOT_FOUND, 'Pay run not found.', 404);
-  return withCounts(payRun);
+  return payRun;
 }
 
 export async function createPayRun(input: CreatePayRunInput) {
@@ -69,6 +70,10 @@ export async function createPayRun(input: CreatePayRunInput) {
   }
   if (input.employeeIds.length === 0) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Select at least one employee.', 422);
+  }
+  const uniqueEmployeeIds = new Set(input.employeeIds);
+  if (uniqueEmployeeIds.size !== input.employeeIds.length) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Each employee can only be selected once for a pay run.', 422);
   }
   const structure = await salaryStructureRepository().findOne({ where: { id: input.salaryStructureId } });
   if (!structure) throw new AppError(ErrorCodes.NOT_FOUND, 'Selected salary structure does not exist.', 404);
@@ -109,44 +114,79 @@ export async function deletePayRun(id: string) {
   if (!result.affected) throw new AppError(ErrorCodes.NOT_FOUND, 'Pay run not found.', 404);
 }
 
+interface Warning {
+  type: PayslipWarningType;
+  message: string;
+}
+
 interface RuleEvaluation {
   rule: SalaryRule;
   amount: number;
-  warning?: string;
+  warning?: Warning;
 }
 
-function evaluateRule(rule: SalaryRule, wagePerMonth: number): RuleEvaluation {
+function evaluateRule(rule: SalaryRule, wagePerMonth: number, ctx: FormulaContext): RuleEvaluation {
   switch (rule.computationMethod) {
     case SalaryRuleComputationMethod.FIXED:
       return { rule, amount: Number(rule.value ?? 0) };
     case SalaryRuleComputationMethod.PERCENTAGE:
       return { rule, amount: Number(((wagePerMonth * Number(rule.value ?? 0)) / 100).toFixed(2)) };
     case SalaryRuleComputationMethod.FORMULA:
-      return {
-        rule,
-        amount: 0,
-        warning: `Formula-based rule "${rule.name}" is not supported yet — treated as 0.`,
-      };
+      try {
+        const amount = evaluateFormula(rule.formula ?? '', ctx);
+        if (!Number.isFinite(amount)) throw new Error('formula did not evaluate to a finite number');
+        return { rule, amount: Number(amount.toFixed(2)) };
+      } catch (err) {
+        return {
+          rule,
+          amount: 0,
+          warning: {
+            type: PayslipWarningType.FORMULA_ERROR,
+            message: `Formula for rule "${rule.name}" could not be evaluated (${
+              err instanceof Error ? err.message : 'unknown error'
+            }) — treated as 0.`,
+          },
+        };
+      }
   }
+}
+
+/** Applies the accumulated warnings to a payslip: joined text in `warning`, discrete codes in `warningTypes`. */
+function applyWarnings(payslip: Payslip, warnings: Warning[]) {
+  payslip.warning = warnings.length ? warnings.map((w) => w.message).join(' ') : null;
+  payslip.warningTypes = warnings.length ? warnings.map((w) => w.type) : null;
 }
 
 /** Recomputes one payslip's lines/totals in place from its resolved contract + the pay run's salary structure rules. */
 async function computeOnePayslip(payslip: Payslip, rules: SalaryRule[], periodStart: string, periodEnd: string) {
-  const warnings: string[] = [];
+  const warnings: Warning[] = [];
+
+  const employee = await employeeRepository().findOne({ where: { id: payslip.employeeId } });
+  if (!employee?.bankAccountNumber) {
+    warnings.push({ type: PayslipWarningType.MISSING_BANK_DETAILS, message: 'Missing bank details for this employee.' });
+  }
 
   if (!payslip.contractId) {
     payslip.workedDays = '0';
     payslip.basic = '0';
     payslip.grossTotal = '0';
     payslip.netTotal = '0';
-    payslip.warning = 'No active contract found for this employee covering this period.';
+    warnings.unshift({
+      type: PayslipWarningType.NO_ACTIVE_CONTRACT,
+      message: 'No active contract found for this employee covering this period.',
+    });
+    applyWarnings(payslip, warnings);
     await payslipLineRepository().delete({ payslipId: payslip.id });
     return payslip;
   }
 
   const contract = await contractRepository().findOne({ where: { id: payslip.contractId } });
   if (!contract) {
-    payslip.warning = 'The contract linked to this payslip no longer exists.';
+    warnings.unshift({
+      type: PayslipWarningType.CONTRACT_DELETED,
+      message: 'The contract linked to this payslip no longer exists.',
+    });
+    applyWarnings(payslip, warnings);
     payslip.workedDays = '0';
     payslip.basic = '0';
     payslip.grossTotal = '0';
@@ -158,15 +198,26 @@ async function computeOnePayslip(payslip: Payslip, rules: SalaryRule[], periodSt
   const workedDaysInPeriod = await attendanceRepository()
     .createQueryBuilder('attendance')
     .where('attendance.employee_id = :employeeId', { employeeId: payslip.employeeId })
-    .andWhere('attendance.status = :status', { status: AttendanceStatus.PRESENT })
+    .andWhere('attendance.status IN (:...statuses)', { statuses: [AttendanceStatus.PRESENT, AttendanceStatus.LATE] })
     .andWhere('attendance.date BETWEEN :periodStart AND :periodEnd', { periodStart, periodEnd })
     .getCount();
   if (workedDaysInPeriod === 0) {
-    warnings.push('No attendance records found for this period.');
+    warnings.push({ type: PayslipWarningType.NO_ATTENDANCE, message: 'No attendance records found for this period.' });
   }
 
   const wagePerMonth = Number(contract.wagePerMonth);
-  const evaluations = rules.map((rule) => evaluateRule(rule, wagePerMonth));
+  const ctx: FormulaContext = {
+    categories: {},
+    codes: {},
+    variables: { wage: wagePerMonth, workedDays: workedDaysInPeriod },
+  };
+  const evaluations: RuleEvaluation[] = [];
+  for (const rule of rules) {
+    const evaluation = evaluateRule(rule, wagePerMonth, ctx);
+    evaluations.push(evaluation);
+    ctx.codes[rule.code] = evaluation.amount;
+    ctx.categories[rule.category] = (ctx.categories[rule.category] ?? 0) + evaluation.amount;
+  }
   evaluations.forEach((e) => e.warning && warnings.push(e.warning));
 
   const sum = (category: SalaryRuleCategory) =>
@@ -198,7 +249,7 @@ async function computeOnePayslip(payslip: Payslip, rules: SalaryRule[], periodSt
   payslip.basic = basicTotal.toFixed(2);
   payslip.grossTotal = gross.toFixed(2);
   payslip.netTotal = net.toFixed(2);
-  payslip.warning = warnings.length ? warnings.join(' ') : null;
+  applyWarnings(payslip, warnings);
 
   return payslip;
 }

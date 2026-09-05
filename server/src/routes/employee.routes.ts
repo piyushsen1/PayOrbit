@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
-import { EmployeeStatus } from '../entities/Employee';
+import { EmployeeStatus, EmployeeType } from '../entities/Employee';
 import {
   listEmployeesHandler,
   getEmployeeHandler,
@@ -27,6 +27,7 @@ const employeeBodyBase = {
   jobPosition: z.string().min(1).nullable().optional(),
   department: z.string().min(1).nullable().optional(),
   status: z.nativeEnum(EmployeeStatus).optional(),
+  employeeType: z.nativeEnum(EmployeeType).optional(),
   managerId: z.string().uuid().nullable().optional(),
   workingScheduleId: z.string().uuid().nullable().optional(),
   workLocation: z.string().min(1).nullable().optional(),
@@ -37,6 +38,7 @@ const employeeBodyBase = {
   dateOfBirth: z.string().date().nullable().optional(),
   emergencyContactName: z.string().min(1).nullable().optional(),
   emergencyContactPhone: z.string().min(1).nullable().optional(),
+  bankAccountNumber: z.string().min(1).nullable().optional(),
 };
 
 const createEmployeeSchema = z.object({
@@ -115,6 +117,9 @@ router.get('/:id', authGuard, roleGuard(...MANAGE_ROLES), validate(idParamOnlySc
  *               status:
  *                 type: string
  *                 enum: [active, inactive]
+ *               employeeType:
+ *                 type: string
+ *                 enum: [full_time, part_time, contract, intern]
  *               managerId:
  *                 type: string
  *                 format: uuid
@@ -138,6 +143,8 @@ router.get('/:id', authGuard, roleGuard(...MANAGE_ROLES), validate(idParamOnlySc
  *               emergencyContactName:
  *                 type: string
  *               emergencyContactPhone:
+ *                 type: string
+ *               bankAccountNumber:
  *                 type: string
  *     responses:
  *       201:

@@ -6,6 +6,14 @@ export enum EmployeeStatus {
   INACTIVE = 'inactive',
 }
 
+/** Employment category — a Dashboard filter dimension (Period/Department/Employee Type/Company). */
+export enum EmployeeType {
+  FULL_TIME = 'full_time',
+  PART_TIME = 'part_time',
+  CONTRACT = 'contract',
+  INTERN = 'intern',
+}
+
 /**
  * Central HR record — Employee Form hub (Work Information / Private Information
  * tabs). `department`/`company`/`workLocation` are plain strings, not relations
@@ -30,6 +38,9 @@ export class Employee {
 
   @Column({ type: 'enum', enum: EmployeeStatus, default: EmployeeStatus.ACTIVE })
   status!: EmployeeStatus;
+
+  @Column({ type: 'enum', enum: EmployeeType, name: 'employee_type', default: EmployeeType.FULL_TIME })
+  employeeType!: EmployeeType;
 
   @Column({ type: 'uuid', name: 'manager_id', nullable: true })
   managerId!: string | null;
@@ -69,6 +80,10 @@ export class Employee {
 
   @Column({ type: 'varchar', name: 'emergency_contact_phone', nullable: true })
   emergencyContactPhone!: string | null;
+
+  /** Missing this triggers the "missing bank details" pay-run warning (see pay-run.service.ts). */
+  @Column({ type: 'varchar', name: 'bank_account_number', nullable: true })
+  bankAccountNumber!: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

@@ -3,6 +3,7 @@ import { Employee } from './Employee';
 
 export enum AttendanceStatus {
   PRESENT = 'present',
+  LATE = 'late',
   ABSENT = 'absent',
 }
 

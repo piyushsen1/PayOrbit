@@ -1,27 +1,49 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/api';
+import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { listMockContracts, getContractStatus, type Contract } from '@/lib/mockContracts';
+import { useToast } from '@/components/ui/Toast';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
 const CONTRACTS_MODULE_ROLES: Role[] = ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'];
+
+interface Employee {
+  id: string;
+  fullName: string;
+}
+
+interface Contract {
+  id: string;
+  contractNumber: string;
+  employeeId: string;
+  startDate: string;
+  endDate: string | null;
+  wagePerMonth: string;
+  status: 'running' | 'expired';
+}
+
+interface ApiErrorBody {
+  error: { code: string; message: string };
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-function formatWage(amount: number): string {
-  return `₹${amount.toLocaleString('en-IN')}`;
+function formatWage(amount: string): string {
+  return `₹${Number(amount).toLocaleString('en-IN')}`;
 }
 
 function SearchIcon() {
@@ -50,23 +72,52 @@ export default function ContractsPage() {
 
 function ContractsPageContent() {
   const { user, isLoading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const employeeIdFilter = searchParams.get('employeeId') ?? undefined;
 
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [search, setSearch] = useState(searchParams.get('employee') ?? '');
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const canAccess = !!user && CONTRACTS_MODULE_ROLES.includes(user.role);
 
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [contractsRes, employeesRes] = await Promise.all([
+        api.get<{ data: Contract[] }>('/contracts', { params: employeeIdFilter ? { employeeId: employeeIdFilter } : {} }),
+        api.get<{ data: Employee[] }>('/employees'),
+      ]);
+      setContracts(contractsRes.data.data);
+      setEmployees(employeesRes.data.data);
+    } catch (err) {
+      const axiosErr = err as AxiosError<ApiErrorBody>;
+      showToast({
+        title: 'Failed to load contracts',
+        description: getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message),
+        variant: 'danger',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [employeeIdFilter, showToast]);
+
   useEffect(() => {
-    if (canAccess) setContracts(listMockContracts());
-  }, [canAccess]);
+    if (canAccess) loadData();
+  }, [canAccess, loadData]);
+
+  const employeeNameById = useMemo(() => new Map(employees.map((e) => [e.id, e.fullName])), [employees]);
 
   const filtered = useMemo(() => {
     if (!search) return contracts;
     const needle = search.toLowerCase();
-    return contracts.filter((c) => `${c.contractNumber} ${c.employeeName}`.toLowerCase().includes(needle));
-  }, [contracts, search]);
+    return contracts.filter((c) =>
+      `${c.contractNumber} ${employeeNameById.get(c.employeeId) ?? ''}`.toLowerCase().includes(needle)
+    );
+  }, [contracts, search, employeeNameById]);
 
   if (authLoading) return null;
 
@@ -99,7 +150,9 @@ function ContractsPageContent() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : filtered.length === 0 ? (
         <EmptyState title="No contracts found" description="Create a contract to get started." />
       ) : (
         <Table>
@@ -114,23 +167,20 @@ function ContractsPageContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.map((c) => {
-              const status = getContractStatus(c);
-              return (
-                <TableRow key={c.id} className="cursor-pointer" onClick={() => router.push(`/contracts/${c.id}`)}>
-                  <TableCell className="num font-medium">{c.contractNumber}</TableCell>
-                  <TableCell>{c.employeeName}</TableCell>
-                  <TableCell>{formatDate(c.startDate)}</TableCell>
-                  <TableCell>{formatDate(c.endDate)}</TableCell>
-                  <TableCell className="num">{formatWage(c.wagePerMonth)}</TableCell>
-                  <TableCell>
-                    <Badge variant={status === 'running' ? 'success' : 'danger'} dot>
-                      {status === 'running' ? 'Running' : 'Expired'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {filtered.map((c) => (
+              <TableRow key={c.id} className="cursor-pointer" onClick={() => router.push(`/contracts/${c.id}`)}>
+                <TableCell className="num font-medium">{c.contractNumber}</TableCell>
+                <TableCell>{employeeNameById.get(c.employeeId) ?? '—'}</TableCell>
+                <TableCell>{formatDate(c.startDate)}</TableCell>
+                <TableCell>{formatDate(c.endDate)}</TableCell>
+                <TableCell className="num">{formatWage(c.wagePerMonth)}</TableCell>
+                <TableCell>
+                  <Badge variant={c.status === 'running' ? 'success' : 'danger'} dot>
+                    {c.status === 'running' ? 'Running' : 'Expired'}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       )}

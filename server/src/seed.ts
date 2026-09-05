@@ -9,6 +9,7 @@ import { DayOfWeek, WorkingScheduleDay } from './entities/WorkingScheduleDay';
 import { TimeOffType, TimeOffUnit } from './entities/TimeOffType';
 import { SalaryStructure } from './entities/SalaryStructure';
 import { SalaryRule, SalaryRuleCategory, SalaryRuleComputationMethod } from './entities/SalaryRule';
+import { Contract } from './entities/Contract';
 
 const SALT_ROUNDS = 10;
 const USERS_TO_SEED = 10;
@@ -35,11 +36,12 @@ async function seed() {
   const timeOffTypeRepository = AppDataSource.getRepository(TimeOffType);
   const salaryStructureRepository = AppDataSource.getRepository(SalaryStructure);
   const salaryRuleRepository = AppDataSource.getRepository(SalaryRule);
+  const contractRepository = AppDataSource.getRepository(Contract);
 
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, SALT_ROUNDS);
 
   const weekdays = [DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY];
-  await workingScheduleRepository.save(
+  const standardSchedule = await workingScheduleRepository.save(
     workingScheduleRepository.create({
       name: 'Standard 40h/Week',
       company: 'PayOrbit',
@@ -107,6 +109,7 @@ async function seed() {
     role: UserRole.ADMIN,
   });
 
+  const employeesByName: Record<string, Employee> = {};
   for (const account of DEMO_ACCOUNTS) {
     const workEmail = `${account.fullName.toLowerCase().replace(/\s+/g, '.')}@company.com`;
     const employee = await employeeRepository.save(
@@ -115,8 +118,10 @@ async function seed() {
         workEmail,
         jobPosition: account.jobPosition,
         department: account.department,
+        workingScheduleId: standardSchedule.id,
       })
     );
+    employeesByName[account.fullName] = employee;
     await userRepository.save(
       userRepository.create({
         email: workEmail,
@@ -127,6 +132,34 @@ async function seed() {
     );
   }
   console.log(`Seeded ${DEMO_ACCOUNTS.length} employees with linked user accounts (one per role).`);
+
+  const DEMO_CONTRACTS: Array<{ employeeName: string; startDate: string; endDate: string | null; wagePerMonth: string }> = [
+    { employeeName: 'Aarav Mehta', startDate: '2025-07-01', endDate: '2025-12-31', wagePerMonth: '78000.00' },
+    { employeeName: 'Aarav Mehta', startDate: '2026-01-01', endDate: null, wagePerMonth: '85000.00' },
+    { employeeName: 'Maya Shah', startDate: '2026-01-01', endDate: null, wagePerMonth: '95000.00' },
+    { employeeName: 'Nisha Rao', startDate: '2026-01-01', endDate: null, wagePerMonth: '110000.00' },
+    { employeeName: 'Rohan Patel', startDate: '2026-02-01', endDate: null, wagePerMonth: '65000.00' },
+  ];
+  let contractSequence = 0;
+  await contractRepository.save(
+    DEMO_CONTRACTS.map((c) => {
+      const employee = employeesByName[c.employeeName];
+      contractSequence += 1;
+      return contractRepository.create({
+        contractNumber: `CON/${new Date(c.startDate).getFullYear()}/${String(contractSequence).padStart(4, '0')}`,
+        employeeId: employee.id,
+        department: employee.department,
+        jobPosition: employee.jobPosition,
+        startDate: c.startDate,
+        endDate: c.endDate,
+        wagePerMonth: c.wagePerMonth,
+        workingScheduleId: standardSchedule.id,
+        salaryStructureId: standardStructure.id,
+        notes: c.endDate ? 'Superseded by a later contract.' : 'Running contract — source for payroll in the active period.',
+      });
+    })
+  );
+  console.log(`Seeded ${DEMO_CONTRACTS.length} contracts.`);
 
   const users = Array.from({ length: USERS_TO_SEED }, () =>
     userRepository.create({

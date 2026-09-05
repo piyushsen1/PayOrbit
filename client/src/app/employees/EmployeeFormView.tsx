@@ -1,12 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
-import { countContractsForEmployee } from '@/lib/mockContracts';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -150,6 +149,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   const [tab, setTab] = useState('work');
   const [form, setForm] = useState<FormState>(emptyForm());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [contractsCount, setContractsCount] = useState(0);
 
   const canAccess = !!user && EMPLOYEE_MODULE_ROLES.includes(user.role);
 
@@ -168,6 +168,11 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
           const { data } = await api.get<{ data: Employee }>(`/employees/${employeeId}`);
           setEmployee(data.data);
           setForm(toFormState(data.data));
+
+          const contractsRes = await api
+            .get<{ data: unknown[] }>('/contracts', { params: { employeeId } })
+            .catch(() => ({ data: { data: [] as unknown[] } }));
+          setContractsCount(contractsRes.data.data.length);
         } catch (err) {
           const axiosErr = err as AxiosError<ApiErrorBody>;
           if (axiosErr.response?.status === 404) {
@@ -192,11 +197,6 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   useEffect(() => {
     if (canAccess) loadData();
   }, [canAccess, loadData]);
-
-  const contractsCount = useMemo(
-    () => (form.fullName ? countContractsForEmployee(form.fullName) : 0),
-    [form.fullName]
-  );
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -307,7 +307,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push(`/contracts?employee=${encodeURIComponent(form.fullName)}`)}
+                onClick={() => router.push(`/contracts?employeeId=${employeeId}`)}
               >
                 Contracts {contractsCount}
               </Button>

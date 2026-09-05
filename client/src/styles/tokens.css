@@ -1,0 +1,103 @@
+/**
+ * Design tokens. Values below are the dataviz skill's validated reference
+ * palette (see references/palette.md) — real values get swapped in from the
+ * brand mock on day 1, but the variable NAMES here are what every component
+ * is written against, so the swap is a one-file edit.
+ */
+:root {
+  /* ---- Neutral scale (warm gray, matches the chart chrome ink) ---- */
+  --color-gray-50: #f9f9f7;
+  --color-gray-100: #f2f1ed;
+  --color-gray-200: #e1e0d9;
+  --color-gray-300: #c3c2b7;
+  --color-gray-400: #a3a196;
+  --color-gray-500: #898781;
+  --color-gray-600: #6b6a64;
+  --color-gray-700: #52514e;
+  --color-gray-800: #34332f;
+  --color-gray-900: #0b0b0b;
+
+  /* ---- Primary scale (sequential blue ramp) ---- */
+  --color-primary-100: #cde2fb;
+  --color-primary-150: #b7d3f6;
+  --color-primary-200: #9ec5f4;
+  --color-primary-250: #86b6ef;
+  --color-primary-300: #6da7ec;
+  --color-primary-350: #5598e7;
+  --color-primary-400: #3987e5;
+  --color-primary-450: #2a78d6;
+  --color-primary-500: #256abf;
+  --color-primary-550: #1c5cab;
+  --color-primary-600: #184f95;
+  --color-primary-650: #104281;
+  --color-primary-700: #0d366b;
+
+  /* ---- Semantic status (fixed — never themed, never reused for series) ---- */
+  --color-success: #0ca30c;
+  --color-warning: #fab219;
+  --color-serious: #ec835a;
+  --color-danger: #d03b3b;
+  --color-info: var(--color-primary-450);
+
+  /* ---- Surfaces & ink ---- */
+  --color-bg: var(--color-gray-50);
+  --color-surface: #fcfcfb;
+  --color-border: var(--color-gray-200);
+  --color-text: var(--color-gray-900);
+  --color-text-muted: var(--color-gray-700);
+  --color-text-subtle: var(--color-gray-500);
+
+  /* ---- Categorical chart series (fixed order — never cycled/reassigned) ---- */
+  --chart-series-1: #2a78d6; /* blue */
+  --chart-series-2: #eb6834; /* orange */
+  --chart-series-3: #1baf7a; /* aqua */
+  --chart-series-4: #eda100; /* yellow */
+  --chart-series-5: #e87ba4; /* magenta */
+  --chart-series-6: #008300; /* green */
+  --chart-series-7: #4a3aa7; /* violet */
+  --chart-series-8: #e34948; /* red */
+
+  /* ---- Type scale ---- */
+  --font-family-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ---- Spacing scale (4px grid) ---- */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ---- Radius scale ---- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* ---- Shadow scale ---- */
+  --shadow-sm: 0 1px 2px rgba(11, 11, 11, 0.06);
+  --shadow-md: 0 4px 8px rgba(11, 11, 11, 0.08);
+  --shadow-lg: 0 8px 24px rgba(11, 11, 11, 0.1);
+  --shadow-xl: 0 16px 48px rgba(11, 11, 11, 0.12);
+}

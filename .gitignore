@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Human-readable project docs (never pushed to GitHub)
+docs/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Uploads (local disk storage for dev)
+server/uploads/*
+!server/uploads/.gitkeep

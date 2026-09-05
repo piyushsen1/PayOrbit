@@ -10,6 +10,9 @@ import { TimeOffType, TimeOffUnit } from './entities/TimeOffType';
 import { SalaryStructure } from './entities/SalaryStructure';
 import { SalaryRule, SalaryRuleCategory, SalaryRuleComputationMethod } from './entities/SalaryRule';
 import { Contract } from './entities/Contract';
+import { Attendance, AttendanceStatus } from './entities/Attendance';
+import { TimeOffAllocation, TimeOffAllocationStatus } from './entities/TimeOffAllocation';
+import { TimeOffRequest, TimeOffRequestStatus } from './entities/TimeOffRequest';
 
 const SALT_ROUNDS = 10;
 const USERS_TO_SEED = 10;
@@ -37,6 +40,9 @@ async function seed() {
   const salaryStructureRepository = AppDataSource.getRepository(SalaryStructure);
   const salaryRuleRepository = AppDataSource.getRepository(SalaryRule);
   const contractRepository = AppDataSource.getRepository(Contract);
+  const attendanceRepository = AppDataSource.getRepository(Attendance);
+  const timeOffAllocationRepository = AppDataSource.getRepository(TimeOffAllocation);
+  const timeOffRequestRepository = AppDataSource.getRepository(TimeOffRequest);
 
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, SALT_ROUNDS);
 
@@ -66,7 +72,8 @@ async function seed() {
     { name: 'Sick Leave', unit: TimeOffUnit.DAYS, allocationRequired: false, approvalRole: UserRole.HR_MANAGER, affectsPayroll: true, color: '#EF4444' },
     { name: 'Unpaid Leave', unit: TimeOffUnit.DAYS, allocationRequired: false, approvalRole: UserRole.HR_PAYROLL_MANAGER, affectsPayroll: false, color: '#6B7280' },
   ];
-  await timeOffTypeRepository.save(DEMO_TIME_OFF_TYPES.map((type) => timeOffTypeRepository.create(type)));
+  const savedTimeOffTypes = await timeOffTypeRepository.save(DEMO_TIME_OFF_TYPES.map((type) => timeOffTypeRepository.create(type)));
+  const ptoType = savedTimeOffTypes.find((t) => t.name === 'Paid Time Off')!;
   console.log(`Seeded ${DEMO_TIME_OFF_TYPES.length} time off types.`);
 
   const standardStructure = await salaryStructureRepository.save(
@@ -160,6 +167,64 @@ async function seed() {
     })
   );
   console.log(`Seeded ${DEMO_CONTRACTS.length} contracts.`);
+
+  const today = new Date();
+  const isoDate = (daysAgo: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - daysAgo);
+    return d.toISOString().slice(0, 10);
+  };
+  const DEMO_ATTENDANCE: Array<{ employeeName: string; daysAgo: number; checkInHour: number; checkOutHour: number }> = [
+    { employeeName: 'Rohan Patel', daysAgo: 1, checkInHour: 9, checkOutHour: 18 },
+    { employeeName: 'Rohan Patel', daysAgo: 2, checkInHour: 9, checkOutHour: 20 },
+    { employeeName: 'Aarav Mehta', daysAgo: 1, checkInHour: 9, checkOutHour: 17 },
+  ];
+  await attendanceRepository.save(
+    DEMO_ATTENDANCE.map(({ employeeName, daysAgo, checkInHour, checkOutHour }) => {
+      const employee = employeesByName[employeeName];
+      const date = isoDate(daysAgo);
+      return attendanceRepository.create({
+        employeeId: employee.id,
+        date,
+        checkIn: new Date(`${date}T${String(checkInHour).padStart(2, '0')}:00:00Z`),
+        checkOut: new Date(`${date}T${String(checkOutHour).padStart(2, '0')}:00:00Z`),
+        status: AttendanceStatus.PRESENT,
+      });
+    })
+  );
+  console.log(`Seeded ${DEMO_ATTENDANCE.length} attendance records.`);
+
+  const rohanAllocation = await timeOffAllocationRepository.save(
+    timeOffAllocationRepository.create({
+      employeeId: employeesByName['Rohan Patel'].id,
+      timeOffTypeId: ptoType.id,
+      allocated: '10.00',
+      status: TimeOffAllocationStatus.APPROVED,
+    })
+  );
+  await timeOffAllocationRepository.save(
+    timeOffAllocationRepository.create({
+      employeeId: employeesByName['Aarav Mehta'].id,
+      timeOffTypeId: ptoType.id,
+      allocated: '12.00',
+      status: TimeOffAllocationStatus.APPROVED,
+    })
+  );
+  console.log('Seeded 2 approved time off allocations (Paid Time Off).');
+
+  await timeOffRequestRepository.save(
+    timeOffRequestRepository.create({
+      employeeId: employeesByName['Rohan Patel'].id,
+      timeOffTypeId: ptoType.id,
+      allocationId: rohanAllocation.id,
+      startDate: '2026-10-01',
+      endDate: '2026-10-03',
+      duration: '3.00',
+      status: TimeOffRequestStatus.APPROVED,
+      reason: 'Family trip',
+    })
+  );
+  console.log('Seeded 1 approved time off request.');
 
   const users = Array.from({ length: USERS_TO_SEED }, () =>
     userRepository.create({

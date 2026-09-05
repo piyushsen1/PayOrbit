@@ -20,6 +20,11 @@ const envSchema = z.object({
   DB_USER: z.string().default('postgres'),
   DB_PASSWORD: z.string().default('postgres'),
   DB_NAME: z.string().default('app_db'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().default('payroll@payorbit.example'),
 });
 
 const parsed = envSchema.safeParse(process.env);

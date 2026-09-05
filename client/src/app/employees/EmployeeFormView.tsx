@@ -1,25 +1,30 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AxiosError } from 'axios';
-import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/lib/api';
-import { getErrorMessage } from '@/lib/errorMessages';
-import { Container } from '@/components/layout/Container';
-import { Card, CardBody } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Avatar } from '@/components/ui/Avatar';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { useToast } from '@/components/ui/Toast';
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AxiosError } from "axios";
+import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errorMessages";
+import { Container } from "@/components/layout/Container";
+import { Card, CardBody } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Avatar } from "@/components/ui/Avatar";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 
-type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
-type Status = 'active' | 'inactive';
+type Role =
+  | "employee"
+  | "hr_manager"
+  | "hr_payroll_user"
+  | "hr_payroll_manager"
+  | "admin";
+type Status = "active" | "inactive";
 
 interface Employee {
   id: string;
@@ -50,7 +55,12 @@ interface ApiErrorBody {
   error: { code: string; message: string };
 }
 
-const EMPLOYEE_MODULE_ROLES: Role[] = ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'];
+const EMPLOYEE_MODULE_ROLES: Role[] = [
+  "hr_manager",
+  "hr_payroll_user",
+  "hr_payroll_manager",
+  "admin",
+];
 
 interface FormState {
   fullName: string;
@@ -72,21 +82,21 @@ interface FormState {
 
 function emptyForm(): FormState {
   return {
-    fullName: '',
-    workEmail: '',
-    jobPosition: '',
-    department: '',
-    status: 'active',
-    managerId: '',
-    workingScheduleId: '',
-    workLocation: '',
-    company: '',
-    phone: '',
-    personalEmail: '',
-    homeAddress: '',
-    dateOfBirth: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
+    fullName: "",
+    workEmail: "",
+    jobPosition: "",
+    department: "",
+    status: "active",
+    managerId: "",
+    workingScheduleId: "",
+    workLocation: "",
+    company: "",
+    phone: "",
+    personalEmail: "",
+    homeAddress: "",
+    dateOfBirth: "",
+    emergencyContactName: "",
+    emergencyContactPhone: "",
   };
 }
 
@@ -94,19 +104,19 @@ function toFormState(employee: Employee): FormState {
   return {
     fullName: employee.fullName,
     workEmail: employee.workEmail,
-    jobPosition: employee.jobPosition ?? '',
-    department: employee.department ?? '',
+    jobPosition: employee.jobPosition ?? "",
+    department: employee.department ?? "",
     status: employee.status,
-    managerId: employee.managerId ?? '',
-    workingScheduleId: employee.workingScheduleId ?? '',
-    workLocation: employee.workLocation ?? '',
-    company: employee.company ?? '',
-    phone: employee.phone ?? '',
-    personalEmail: employee.personalEmail ?? '',
-    homeAddress: employee.homeAddress ?? '',
-    dateOfBirth: employee.dateOfBirth ?? '',
-    emergencyContactName: employee.emergencyContactName ?? '',
-    emergencyContactPhone: employee.emergencyContactPhone ?? '',
+    managerId: employee.managerId ?? "",
+    workingScheduleId: employee.workingScheduleId ?? "",
+    workLocation: employee.workLocation ?? "",
+    company: employee.company ?? "",
+    phone: employee.phone ?? "",
+    personalEmail: employee.personalEmail ?? "",
+    homeAddress: employee.homeAddress ?? "",
+    dateOfBirth: employee.dateOfBirth ?? "",
+    emergencyContactName: employee.emergencyContactName ?? "",
+    emergencyContactPhone: employee.emergencyContactPhone ?? "",
   };
 }
 
@@ -131,7 +141,7 @@ function buildPayload(form: FormState) {
 }
 
 export interface EmployeeFormViewProps {
-  mode: 'create' | 'edit';
+  mode: "create" | "edit";
   employeeId?: string;
 }
 
@@ -141,12 +151,14 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   const router = useRouter();
 
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
-  const [workingSchedules, setWorkingSchedules] = useState<WorkingSchedule[]>([]);
+  const [workingSchedules, setWorkingSchedules] = useState<WorkingSchedule[]>(
+    [],
+  );
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [isEditing, setIsEditing] = useState(mode === 'create');
-  const [tab, setTab] = useState('work');
+  const [isEditing, setIsEditing] = useState(mode === "create");
+  const [tab, setTab] = useState("work");
   const [form, setForm] = useState<FormState>(emptyForm());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contractsCount, setContractsCount] = useState(0);
@@ -157,20 +169,24 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
     setIsLoading(true);
     try {
       const [employeesRes, schedulesRes] = await Promise.all([
-        api.get<{ data: Employee[] }>('/employees'),
-        api.get<{ data: WorkingSchedule[] }>('/working-schedules').catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
+        api.get<{ data: Employee[] }>("/employees"),
+        api
+          .get<{ data: WorkingSchedule[] }>("/working-schedules")
+          .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
       ]);
       setAllEmployees(employeesRes.data.data);
       setWorkingSchedules(schedulesRes.data.data);
 
-      if (mode === 'edit' && employeeId) {
+      if (mode === "edit" && employeeId) {
         try {
-          const { data } = await api.get<{ data: Employee }>(`/employees/${employeeId}`);
+          const { data } = await api.get<{ data: Employee }>(
+            `/employees/${employeeId}`,
+          );
           setEmployee(data.data);
           setForm(toFormState(data.data));
 
           const contractsRes = await api
-            .get<{ data: unknown[] }>('/contracts', { params: { employeeId } })
+            .get<{ data: unknown[] }>("/contracts", { params: { employeeId } })
             .catch(() => ({ data: { data: [] as unknown[] } }));
           setContractsCount(contractsRes.data.data.length);
         } catch (err) {
@@ -185,9 +201,12 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
-        title: 'Failed to load employee data',
-        description: getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message),
-        variant: 'danger',
+        title: "Failed to load employee data",
+        description: getErrorMessage(
+          axiosErr.response?.data?.error?.code,
+          axiosErr.response?.data?.error?.message,
+        ),
+        variant: "danger",
       });
     } finally {
       setIsLoading(false);
@@ -209,20 +228,29 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
 
   async function handleCreate() {
     if (!form.fullName.trim() || !form.workEmail.trim()) {
-      showToast({ title: 'Full name and work email are required.', variant: 'danger' });
+      showToast({
+        title: "Full name and work email are required.",
+        variant: "danger",
+      });
       return;
     }
     setIsSubmitting(true);
     try {
-      const { data } = await api.post<{ data: Employee }>('/employees', buildPayload(form));
-      showToast({ title: 'Employee created', variant: 'success' });
+      const { data } = await api.post<{ data: Employee }>(
+        "/employees",
+        buildPayload(form),
+      );
+      showToast({ title: "Employee created", variant: "success" });
       router.push(`/employees/${data.data.id}`);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
-        title: 'Failed to create employee',
-        description: getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message),
-        variant: 'danger',
+        title: "Failed to create employee",
+        description: getErrorMessage(
+          axiosErr.response?.data?.error?.code,
+          axiosErr.response?.data?.error?.message,
+        ),
+        variant: "danger",
       });
     } finally {
       setIsSubmitting(false);
@@ -233,17 +261,23 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
     if (!employee) return;
     setIsSubmitting(true);
     try {
-      const { data } = await api.patch<{ data: Employee }>(`/employees/${employee.id}`, buildPayload(form));
+      const { data } = await api.patch<{ data: Employee }>(
+        `/employees/${employee.id}`,
+        buildPayload(form),
+      );
       setEmployee(data.data);
       setForm(toFormState(data.data));
       setIsEditing(false);
-      showToast({ title: 'Employee updated', variant: 'success' });
+      showToast({ title: "Employee updated", variant: "success" });
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
-        title: 'Failed to save changes',
-        description: getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message),
-        variant: 'danger',
+        title: "Failed to save changes",
+        description: getErrorMessage(
+          axiosErr.response?.data?.error?.code,
+          axiosErr.response?.data?.error?.message,
+        ),
+        variant: "danger",
       });
     } finally {
       setIsSubmitting(false);
@@ -262,15 +296,21 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   if (!canAccess) {
     return (
       <Container className="py-10">
-        <EmptyState title="Not authorized" description="Employees is only available to HR and payroll roles." />
+        <EmptyState
+          title="Not authorized"
+          description="Employees is only available to HR and payroll roles."
+        />
       </Container>
     );
   }
 
-  if (mode === 'edit' && notFound) {
+  if (mode === "edit" && notFound) {
     return (
       <Container className="py-10">
-        <EmptyState title="Employee not found" description="It may have been removed." />
+        <EmptyState
+          title="Employee not found"
+          description="It may have been removed."
+        />
       </Container>
     );
   }
@@ -284,39 +324,59 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
     label: `${s.name} (${s.weeklyHours}h/week)`,
   }));
 
-  const readOnly = mode === 'edit' && !isEditing;
+  const readOnly = mode === "edit" && !isEditing;
 
   return (
     <Container className="flex flex-col gap-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-            {mode === 'create' ? 'New Employee' : `Employee / ${employee?.fullName}`}
+            {mode === "create"
+              ? "New Employee"
+              : `Employee / ${employee?.fullName}`}
           </h1>
           <p className="text-xs text-[var(--text-tertiary)]">
-            {mode === 'create' ? 'Create a new employee record' : 'Main employee form with related HR actions'}
+            {mode === "create"
+              ? "Create a new employee record"
+              : "Main employee form with related HR actions"}
           </p>
         </div>
 
-        {mode === 'edit' && (
+        {mode === "edit" && (
           <div className="flex items-center gap-3">
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" title="Available once the Time Off module ships" disabled>
+              <Button
+                variant="outline"
+                size="sm"
+                title="Available once the Time Off module ships"
+                disabled
+              >
                 Time Off 0
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push(`/contracts?employeeId=${employeeId}`)}
+                onClick={() =>
+                  router.push(`/contracts?employeeId=${employeeId}`)
+                }
               >
                 Contracts {contractsCount}
               </Button>
-              <Button variant="outline" size="sm" title="Available once the Attendance module ships" disabled>
+              <Button
+                variant="outline"
+                size="sm"
+                title="Available once the Attendance module ships"
+                disabled
+              >
                 Attendance 0
               </Button>
             </div>
             {!isEditing ? (
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
                 Edit
               </Button>
             ) : (
@@ -324,7 +384,11 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                 <Button variant="outline" size="sm" onClick={handleCancel}>
                   Cancel
                 </Button>
-                <Button size="sm" onClick={handleSaveEdit} isLoading={isSubmitting}>
+                <Button
+                  size="sm"
+                  onClick={handleSaveEdit}
+                  isLoading={isSubmitting}
+                >
                   Save
                 </Button>
               </div>
@@ -336,30 +400,32 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
       <Card>
         <CardBody className="flex flex-col gap-6">
           <div className="flex items-center gap-4">
-            <Avatar name={form.fullName || '?'} size="lg" />
+            <Avatar name={form.fullName || "?"} size="lg" />
             <div>
-              <p className="text-lg font-semibold text-[var(--text-primary)]">{form.fullName || 'Unnamed employee'}</p>
+              <p className="text-lg font-semibold text-[var(--text-primary)]">
+                {form.fullName || "Unnamed employee"}
+              </p>
               <p className="text-sm text-[var(--text-secondary)]">
-                {form.jobPosition || '—'} • {form.department || '—'}
+                {form.jobPosition || "—"} • {form.department || "—"}
               </p>
               <p className="text-xs text-[var(--text-tertiary)]">
-                {form.workEmail || '—'} {form.phone && `| ${form.phone}`}
+                {form.workEmail || "—"} {form.phone && `| ${form.phone}`}
               </p>
             </div>
           </div>
 
-          {mode === 'create' && (
+          {mode === "create" && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Input
                 label="Full Name *"
                 value={form.fullName}
-                onChange={(e) => setField('fullName', e.target.value)}
+                onChange={(e) => setField("fullName", e.target.value)}
               />
               <Input
                 label="Work Email *"
                 type="email"
                 value={form.workEmail}
-                onChange={(e) => setField('workEmail', e.target.value)}
+                onChange={(e) => setField("workEmail", e.target.value)}
               />
             </div>
           )}
@@ -376,13 +442,13 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   label="Department"
                   value={form.department}
                   disabled={readOnly}
-                  onChange={(e) => setField('department', e.target.value)}
+                  onChange={(e) => setField("department", e.target.value)}
                 />
                 <Input
                   label="Job Position"
                   value={form.jobPosition}
                   disabled={readOnly}
-                  onChange={(e) => setField('jobPosition', e.target.value)}
+                  onChange={(e) => setField("jobPosition", e.target.value)}
                 />
                 <Select
                   label="Manager"
@@ -390,13 +456,13 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   options={managerOptions}
                   value={form.managerId}
                   disabled={readOnly}
-                  onChange={(e) => setField('managerId', e.target.value)}
+                  onChange={(e) => setField("managerId", e.target.value)}
                 />
                 <Input
                   label="Work Location"
                   value={form.workLocation}
                   disabled={readOnly}
-                  onChange={(e) => setField('workLocation', e.target.value)}
+                  onChange={(e) => setField("workLocation", e.target.value)}
                 />
                 <Select
                   label="Working Schedule"
@@ -404,9 +470,11 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   options={scheduleOptions}
                   value={form.workingScheduleId}
                   disabled={readOnly}
-                  onChange={(e) => setField('workingScheduleId', e.target.value)}
+                  onChange={(e) =>
+                    setField("workingScheduleId", e.target.value)
+                  }
                 />
-                {mode === 'edit' ? (
+                {mode === "edit" ? (
                   <div className="flex flex-col gap-1.5">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
                       Status
@@ -414,11 +482,21 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                     <button
                       type="button"
                       disabled={readOnly}
-                      onClick={() => setField('status', form.status === 'active' ? 'inactive' : 'active')}
+                      onClick={() =>
+                        setField(
+                          "status",
+                          form.status === "active" ? "inactive" : "active",
+                        )
+                      }
                       className="w-fit disabled:cursor-not-allowed"
                     >
-                      <Badge variant={form.status === 'active' ? 'success' : 'neutral'} dot>
-                        {form.status === 'active' ? 'Active' : 'Inactive'}
+                      <Badge
+                        variant={
+                          form.status === "active" ? "success" : "neutral"
+                        }
+                        dot
+                      >
+                        {form.status === "active" ? "Active" : "Inactive"}
                       </Badge>
                     </button>
                   </div>
@@ -429,15 +507,15 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   label="Company"
                   value={form.company}
                   disabled={readOnly}
-                  onChange={(e) => setField('company', e.target.value)}
+                  onChange={(e) => setField("company", e.target.value)}
                 />
-                {mode === 'edit' && (
+                {mode === "edit" && (
                   <Input
                     label="Work Email"
                     type="email"
                     value={form.workEmail}
                     disabled={readOnly}
-                    onChange={(e) => setField('workEmail', e.target.value)}
+                    onChange={(e) => setField("workEmail", e.target.value)}
                   />
                 )}
               </div>
@@ -450,44 +528,48 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   type="email"
                   value={form.personalEmail}
                   disabled={readOnly}
-                  onChange={(e) => setField('personalEmail', e.target.value)}
+                  onChange={(e) => setField("personalEmail", e.target.value)}
                 />
                 <Input
                   label="Phone Number"
                   value={form.phone}
                   disabled={readOnly}
-                  onChange={(e) => setField('phone', e.target.value)}
+                  onChange={(e) => setField("phone", e.target.value)}
                 />
                 <Input
                   label="Home Address"
                   value={form.homeAddress}
                   disabled={readOnly}
-                  onChange={(e) => setField('homeAddress', e.target.value)}
+                  onChange={(e) => setField("homeAddress", e.target.value)}
                 />
                 <Input
                   label="Date of Birth"
                   type="date"
                   value={form.dateOfBirth}
                   disabled={readOnly}
-                  onChange={(e) => setField('dateOfBirth', e.target.value)}
+                  onChange={(e) => setField("dateOfBirth", e.target.value)}
                 />
                 <Input
                   label="Emergency Contact Name"
                   value={form.emergencyContactName}
                   disabled={readOnly}
-                  onChange={(e) => setField('emergencyContactName', e.target.value)}
+                  onChange={(e) =>
+                    setField("emergencyContactName", e.target.value)
+                  }
                 />
                 <Input
                   label="Emergency Contact Phone"
                   value={form.emergencyContactPhone}
                   disabled={readOnly}
-                  onChange={(e) => setField('emergencyContactPhone', e.target.value)}
+                  onChange={(e) =>
+                    setField("emergencyContactPhone", e.target.value)
+                  }
                 />
               </div>
             </TabsContent>
           </Tabs>
 
-          {mode === 'create' && (
+          {mode === "create" && (
             <div className="flex justify-end">
               <Button onClick={handleCreate} isLoading={isSubmitting}>
                 Create Employee

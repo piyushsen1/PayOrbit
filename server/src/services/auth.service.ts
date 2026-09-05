@@ -35,6 +35,15 @@ export async function signup(email: string, password: string) {
   return { token: signToken(user), user: toPublicUser(user) };
 }
 
+/** Resolves the Employee id linked to a logged-in user's account — used by self-service flows (attendance check-in/out, own time-off records). */
+export async function getLinkedEmployeeId(userId: string): Promise<string> {
+  const user = await userRepository().findOne({ where: { id: userId } });
+  if (!user?.employeeId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 'Your account is not linked to an employee record.', 404);
+  }
+  return user.employeeId;
+}
+
 export async function login(email: string, password: string) {
   const repo = userRepository();
 

@@ -7,6 +7,9 @@ import timeOffTypeRoutes from './time-off-type.routes';
 import salaryStructureRoutes from './salary-structure.routes';
 import salaryRuleRoutes from './salary-rule.routes';
 import contractRoutes from './contract.routes';
+import attendanceRoutes from './attendance.routes';
+import timeOffAllocationRoutes from './time-off-allocation.routes';
+import timeOffRequestRoutes from './time-off-request.routes';
 
 const router = Router();
 
@@ -18,5 +21,8 @@ router.use('/time-off-types', timeOffTypeRoutes);
 router.use('/salary-structures', salaryStructureRoutes);
 router.use('/salary-rules', salaryRuleRoutes);
 router.use('/contracts', contractRoutes);
+router.use('/attendance', attendanceRoutes);
+router.use('/time-off-allocations', timeOffAllocationRoutes);
+router.use('/time-off-requests', timeOffRequestRoutes);
 
 export default router;

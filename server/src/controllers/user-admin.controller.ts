@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import * as userAdminService from '../services/user-admin.service';
+import { parsePagination } from '../utils/pagination';
+import { UserRole } from '../entities/User';
 
 export async function listUsersHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const users = await userAdminService.listUsersForAdmin();
-    res.success(users);
+    const role = typeof req.query.role === 'string' ? (req.query.role as UserRole) : undefined;
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await userAdminService.listUsersForAdmin({ role }, pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

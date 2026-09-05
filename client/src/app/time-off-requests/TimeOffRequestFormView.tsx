@@ -86,7 +86,7 @@ export function TimeOffRequestFormView({ mode, requestId }: TimeOffRequestFormVi
     try {
       if (mode === 'create') {
         const promises: Promise<unknown>[] = [
-          api.get<{ data: TimeOffType[] }>('/time-off-types').then(
+          api.get<{ data: TimeOffType[] }>('/time-off-types', { params: { limit: 100 } }).then(
             (res) => setTypes(res.data.data),
             (err: AxiosError) => {
               if (err.response?.status === 403) setTypesUnavailable(true);
@@ -95,7 +95,11 @@ export function TimeOffRequestFormView({ mode, requestId }: TimeOffRequestFormVi
           ),
         ];
         if (isHr) {
-          promises.push(api.get<{ data: Employee[] }>('/employees').then((res) => setEmployees(res.data.data)));
+          promises.push(
+            api
+              .get<{ data: Employee[] }>('/employees', { params: { limit: 100 } })
+              .then((res) => setEmployees(res.data.data))
+          );
         }
         await Promise.all(promises);
       } else if (requestId) {

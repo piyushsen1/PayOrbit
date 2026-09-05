@@ -90,8 +90,8 @@ export function TimeOffAllocationFormView({ mode, allocationId }: TimeOffAllocat
           return;
         }
         const [employeesRes, typesRes] = await Promise.all([
-          api.get<{ data: Employee[] }>('/employees'),
-          api.get<{ data: TimeOffType[] }>('/time-off-types'),
+          api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+          api.get<{ data: TimeOffType[] }>('/time-off-types', { params: { limit: 100 } }),
         ]);
         setEmployees(employeesRes.data.data);
         setTypes(typesRes.data.data);

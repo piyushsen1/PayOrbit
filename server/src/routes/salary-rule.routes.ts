@@ -5,6 +5,7 @@ import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
 import { SalaryRuleCategory, SalaryRuleComputationMethod } from '../entities/SalaryRule';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listSalaryRulesHandler,
   getSalaryRuleHandler,
@@ -23,7 +24,7 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
 
 const listQuerySchema = z.object({
-  query: z.object({ salaryStructureId: z.string().uuid().optional() }),
+  query: z.object({ salaryStructureId: z.string().uuid().optional(), ...paginationQuerySchema }),
 });
 
 const ruleBodyBase = {

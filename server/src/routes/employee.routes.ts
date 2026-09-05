@@ -5,6 +5,7 @@ import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
 import { EmployeeStatus, EmployeeType } from '../entities/Employee';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listEmployeesHandler,
   getEmployeeHandler,
@@ -20,6 +21,7 @@ const MANAGE_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
+const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
 
 const employeeBodyBase = {
   fullName: z.string().min(1, 'Full name is required.'),
@@ -58,13 +60,20 @@ const updateEmployeeSchema = z.object({
  *     tags: [Employees]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
  *     responses:
  *       200:
- *         description: List of employees.
+ *         description: Page of employees, with a `meta` pagination block.
  *       403:
  *         description: Caller lacks HR/payroll access.
  */
-router.get('/', authGuard, roleGuard(...MANAGE_ROLES), listEmployeesHandler);
+router.get('/', authGuard, roleGuard(...MANAGE_ROLES), validate(listQuerySchema), listEmployeesHandler);
 
 /**
  * @openapi

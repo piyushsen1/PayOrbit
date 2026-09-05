@@ -13,6 +13,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -69,6 +70,8 @@ function PayslipsPageContent() {
 
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [payRuns, setPayRuns] = useState<PayRun[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
   const canAccess = !!user && PAYSLIP_ROLES.includes(user.role);
@@ -77,10 +80,13 @@ function PayslipsPageContent() {
     setIsLoading(true);
     try {
       const [payslipsRes, payRunsRes] = await Promise.all([
-        api.get<{ data: Payslip[] }>('/payslips', { params: payRunIdFilter ? { payRunId: payRunIdFilter } : {} }),
-        api.get<{ data: PayRun[] }>('/pay-runs'),
+        api.get<{ data: Payslip[]; meta: PaginationMeta }>('/payslips', {
+          params: { ...(payRunIdFilter ? { payRunId: payRunIdFilter } : {}), page },
+        }),
+        api.get<{ data: PayRun[] }>('/pay-runs', { params: { limit: 100 } }),
       ]);
       setPayslips(payslipsRes.data.data);
+      setMeta(payslipsRes.data.meta);
       setPayRuns(payRunsRes.data.data);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -92,7 +98,7 @@ function PayslipsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [payRunIdFilter, showToast]);
+  }, [payRunIdFilter, showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -161,6 +167,8 @@ function PayslipsPageContent() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

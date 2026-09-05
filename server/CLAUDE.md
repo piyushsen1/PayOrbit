@@ -22,6 +22,15 @@ inventing a new one.
 4. **Copy the `users` module**: duplicate the entity's service/controller/route
    trio, rename `User` → `<Name>` throughout, and adjust the Zod schemas in
    the route file to match the new entity's fields.
+4a. **Paginate the list endpoint**: every collection-returning `list*` service
+    function takes a `pagination: PaginationParams` param (default
+    `parsePagination({})`) and uses `repo.findAndCount({ ..., skip, take })`,
+    returning `{ items, meta: buildPaginationMeta(pagination, total) }` — see
+    `src/utils/pagination.ts` and any existing `list*` service for the pattern.
+    Its controller parses `parsePagination(req.query)` and calls
+    `res.success(items, 200, meta)`; its route's query schema spreads
+    `...paginationQuerySchema`. Skip this only for an endpoint that will only
+    ever back a small dropdown, not a table — and say so in the registry.
 5. **Wire the route** into `src/routes/index.ts` (`router.use('/<name>s', ...)`).
 6. **Add guards as needed**:
    - `authGuard` — require a logged-in user.

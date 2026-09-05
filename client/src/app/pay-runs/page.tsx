@@ -13,6 +13,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -39,6 +40,8 @@ export default function PayRunsPage() {
   const router = useRouter();
 
   const [payRuns, setPayRuns] = useState<PayRun[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
   const canAccess = !!user && PAY_RUN_ROLES.includes(user.role);
@@ -46,8 +49,9 @@ export default function PayRunsPage() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data } = await api.get<{ data: PayRun[] }>('/pay-runs');
+      const { data } = await api.get<{ data: PayRun[]; meta: PaginationMeta }>('/pay-runs', { params: { page } });
       setPayRuns(data.data);
+      setMeta(data.meta);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
@@ -58,7 +62,7 @@ export default function PayRunsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -122,6 +126,8 @@ export default function PayRunsPage() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

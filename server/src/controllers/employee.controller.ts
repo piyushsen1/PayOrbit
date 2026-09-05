@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import * as employeeService from '../services/employee.service';
+import { parsePagination } from '../utils/pagination';
 
 export async function listEmployeesHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const employees = await employeeService.listEmployees();
-    res.success(employees);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await employeeService.listEmployees(pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

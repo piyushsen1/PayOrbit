@@ -8,6 +8,7 @@ import { UserRole } from '../entities/User';
 import { AppDataSource } from '../config/data-source';
 import { Attendance, AttendanceStatus } from '../entities/Attendance';
 import { User } from '../entities/User';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listAttendanceHandler,
   getAttendanceHandler,
@@ -16,6 +17,7 @@ import {
   deleteAttendanceHandler,
   checkInHandler,
   checkOutHandler,
+  getTodayAttendanceHandler,
 } from '../controllers/attendance.controller';
 
 const router = Router();
@@ -30,6 +32,7 @@ const listQuerySchema = z.object({
   query: z.object({
     employeeId: z.string().uuid().optional(),
     date: z.string().date().optional(),
+    ...paginationQuerySchema,
   }),
 });
 
@@ -123,6 +126,22 @@ router.post('/check-in', authGuard, checkInHandler);
  *         description: Not checked in, or already checked out, for today.
  */
 router.post('/check-out', authGuard, checkOutHandler);
+
+/**
+ * @openapi
+ * /api/attendance/today:
+ *   get:
+ *     summary: The logged-in user's own attendance record for today, or null if they haven't checked in — lets the self-service widget know its real state on load
+ *     tags: [Attendance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Today's attendance record, or null.
+ *       404:
+ *         description: Account has no linked employee record.
+ */
+router.get('/today', authGuard, getTodayAttendanceHandler);
 
 /**
  * @openapi

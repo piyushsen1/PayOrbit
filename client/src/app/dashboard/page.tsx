@@ -21,6 +21,15 @@ type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager'
 
 const DASHBOARD_ROLES: Role[] = ['hr_payroll_user', 'hr_payroll_manager', 'admin'];
 
+type EmployeeType = 'full_time' | 'part_time' | 'contract' | 'intern';
+
+const EMPLOYEE_TYPE_OPTIONS: { value: EmployeeType; label: string }[] = [
+  { value: 'full_time', label: 'Full-Time' },
+  { value: 'part_time', label: 'Part-Time' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'intern', label: 'Intern' },
+];
+
 interface Employee {
   id: string;
   department: string | null;
@@ -28,9 +37,10 @@ interface Employee {
 }
 
 interface DashboardData {
-  filter: { periodStart: string; periodEnd: string; department?: string; company?: string };
+  filter: { periodStart: string; periodEnd: string; department?: string; company?: string; employeeType?: EmployeeType };
   kpis: {
     totalNetSalaryPaid: number;
+    averageNetSalary: number;
     payslipsGenerated: number;
     approvedTimeOffDays: number;
     attendanceHealthPct: number | null;
@@ -41,7 +51,14 @@ interface DashboardData {
     payslipStatusBreakdown: { status: string; count: number }[];
   };
   panels: {
-    attendanceOverview: { present: number; absent: number; total: number; healthPct: number | null };
+    attendanceOverview: {
+      present: number;
+      late: number;
+      absent: number;
+      total: number;
+      healthPct: number | null;
+      totalOvertimeHours: number;
+    };
     timeOffOverview: { pending: number; approved: number; refused: number; approvedDays: number };
     departmentOverview: { department: string; employeeCount: number }[];
   };
@@ -76,6 +93,7 @@ export default function DashboardPage() {
   const [periodEnd, setPeriodEnd] = useState('');
   const [department, setDepartment] = useState('');
   const [company, setCompany] = useState('');
+  const [employeeType, setEmployeeType] = useState('');
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -83,7 +101,7 @@ export default function DashboardPage() {
 
   const loadEmployees = useCallback(async () => {
     try {
-      const { data } = await api.get<{ data: Employee[] }>('/employees');
+      const { data } = await api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } });
       setEmployees(data.data);
     } catch {
       // Filter options are a convenience; a failed fetch just leaves them empty.
@@ -98,6 +116,7 @@ export default function DashboardPage() {
       if (periodEnd) params.periodEnd = periodEnd;
       if (department) params.department = department;
       if (company) params.company = company;
+      if (employeeType) params.employeeType = employeeType;
       const { data } = await api.get<{ data: DashboardData }>('/dashboard', { params });
       setData(data.data);
       if (!periodStart) setPeriodStart(data.data.filter.periodStart);
@@ -112,7 +131,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [periodStart, periodEnd, department, company, showToast]);
+  }, [periodStart, periodEnd, department, company, employeeType, showToast]);
 
   useEffect(() => {
     if (canAccess) {
@@ -168,6 +187,14 @@ export default function DashboardPage() {
           onChange={(e) => setCompany(e.target.value)}
           className="w-48"
         />
+        <Select
+          label="Employee Type"
+          placeholder="All types"
+          options={EMPLOYEE_TYPE_OPTIONS}
+          value={employeeType}
+          onChange={(e) => setEmployeeType(e.target.value)}
+          className="w-48"
+        />
         <button
           type="button"
           onClick={loadDashboard}
@@ -181,8 +208,9 @@ export default function DashboardPage() {
         <Skeleton className="h-96 w-full" />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <StatTile label="Total Net Salary Paid" value={money(data.kpis.totalNetSalaryPaid)} />
+            <StatTile label="Average Net Salary" value={money(data.kpis.averageNetSalary)} />
             <StatTile label="Payslips Generated" value={String(data.kpis.payslipsGenerated)} />
             <StatTile label="Approved Time Off Days" value={String(data.kpis.approvedTimeOffDays)} />
             <StatTile
@@ -264,8 +292,12 @@ export default function DashboardPage() {
               <CardBody className="flex flex-col gap-2">
                 <h2 className="text-sm font-semibold text-[var(--text-primary)]">Attendance Overview</h2>
                 <p className="text-sm text-[var(--text-secondary)]">Present: {data.panels.attendanceOverview.present}</p>
+                <p className="text-sm text-[var(--text-secondary)]">Late: {data.panels.attendanceOverview.late}</p>
                 <p className="text-sm text-[var(--text-secondary)]">Absent: {data.panels.attendanceOverview.absent}</p>
                 <p className="text-sm text-[var(--text-secondary)]">Total: {data.panels.attendanceOverview.total}</p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Overtime: {data.panels.attendanceOverview.totalOvertimeHours}h
+                </p>
               </CardBody>
             </Card>
             <Card>

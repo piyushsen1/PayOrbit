@@ -8,6 +8,7 @@ import { UserRole } from '../entities/User';
 import { AppDataSource } from '../config/data-source';
 import { TimeOffAllocation } from '../entities/TimeOffAllocation';
 import { User } from '../entities/User';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listAllocationsHandler,
   getAllocationHandler,
@@ -26,7 +27,9 @@ const HR_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR_PAY
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
 
-const listQuerySchema = z.object({ query: z.object({ employeeId: z.string().uuid().optional() }) });
+const listQuerySchema = z.object({
+  query: z.object({ employeeId: z.string().uuid().optional(), ...paginationQuerySchema }),
+});
 
 const createAllocationSchema = z.object({
   body: z.object({

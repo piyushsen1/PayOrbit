@@ -3,6 +3,7 @@ import { TimeOffType, TimeOffTypeStatus, TimeOffUnit } from '../entities/TimeOff
 import { UserRole } from '../entities/User';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const timeOffTypeRepository = () => AppDataSource.getRepository(TimeOffType);
 
@@ -17,8 +18,13 @@ export interface TimeOffTypeInput {
   notes?: string | null;
 }
 
-export async function listTimeOffTypes() {
-  return timeOffTypeRepository().find({ order: { name: 'ASC' } });
+export async function listTimeOffTypes(pagination: PaginationParams = parsePagination({})) {
+  const [items, total] = await timeOffTypeRepository().findAndCount({
+    order: { name: 'ASC' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getTimeOffType(id: string) {

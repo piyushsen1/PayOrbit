@@ -7,13 +7,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
-import { Badge } from '@/components/ui/Badge';
+import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -30,13 +31,24 @@ interface Attendance {
   date: string;
   checkIn: string | null;
   checkOut: string | null;
-  status: 'present' | 'absent';
+  status: 'present' | 'late' | 'absent';
   workedHours: number;
 }
 
 interface ApiErrorBody {
   error: { code: string; message: string };
 }
+
+const STATUS_VARIANT: Record<Attendance['status'], BadgeVariant> = {
+  present: 'success',
+  late: 'warning',
+  absent: 'danger',
+};
+const STATUS_LABEL: Record<Attendance['status'], string> = {
+  present: 'Present',
+  late: 'Late',
+  absent: 'Absent',
+};
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -70,6 +82,8 @@ function AttendancePageContent() {
 
   const [records, setRecords] = useState<Attendance[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [employeeFilter, setEmployeeFilter] = useState(searchParams.get('employeeId') ?? '');
   const [todayOnly, setTodayOnly] = useState(false);
@@ -79,15 +93,16 @@ function AttendancePageContent() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params: Record<string, string> = {};
+      const params: Record<string, string | number> = { page };
       if (employeeFilter) params.employeeId = employeeFilter;
       if (todayOnly) params.date = todayIso();
 
       const [attendanceRes, employeesRes] = await Promise.all([
-        api.get<{ data: Attendance[] }>('/attendance', { params }),
-        api.get<{ data: Employee[] }>('/employees'),
+        api.get<{ data: Attendance[]; meta: PaginationMeta }>('/attendance', { params }),
+        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
       ]);
       setRecords(attendanceRes.data.data);
+      setMeta(attendanceRes.data.meta);
       setEmployees(employeesRes.data.data);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -99,7 +114,7 @@ function AttendancePageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeFilter, todayOnly, showToast]);
+  }, [employeeFilter, todayOnly, showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -163,8 +178,8 @@ function AttendancePageContent() {
                 <TableCell>{formatTime(r.checkOut)}</TableCell>
                 <TableCell className="num">{r.workedHours}</TableCell>
                 <TableCell>
-                  <Badge variant={r.status === 'present' ? 'success' : 'danger'} dot>
-                    {r.status === 'present' ? 'Present' : 'Absent'}
+                  <Badge variant={STATUS_VARIANT[r.status]} dot>
+                    {STATUS_LABEL[r.status]}
                   </Badge>
                 </TableCell>
               </TableRow>
@@ -172,6 +187,8 @@ function AttendancePageContent() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

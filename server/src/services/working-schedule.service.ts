@@ -3,6 +3,7 @@ import { WorkingSchedule, WorkingScheduleStatus } from '../entities/WorkingSched
 import { DayOfWeek, WorkingScheduleDay } from '../entities/WorkingScheduleDay';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const workingScheduleRepository = () => AppDataSource.getRepository(WorkingSchedule);
 const workingScheduleDayRepository = () => AppDataSource.getRepository(WorkingScheduleDay);
@@ -25,9 +26,15 @@ function computeWeeklyHours(days: WorkingScheduleDayInput[]): string {
   return (totalMinutes / 60).toFixed(2);
 }
 
-export async function listWorkingSchedules() {
-  const schedules = await workingScheduleRepository().find({ relations: ['days'], order: { name: 'ASC' } });
-  return schedules.map((schedule) => ({ ...schedule, daysPerWeek: schedule.days.length }));
+export async function listWorkingSchedules(pagination: PaginationParams = parsePagination({})) {
+  const [schedules, total] = await workingScheduleRepository().findAndCount({
+    relations: ['days'],
+    order: { name: 'ASC' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+  const items = schedules.map((schedule) => ({ ...schedule, daysPerWeek: schedule.days.length }));
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getWorkingSchedule(id: string) {

@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import * as contractService from '../services/contract.service';
+import { parsePagination } from '../utils/pagination';
 
 export async function listContractsHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
-    const contracts = await contractService.listContracts({ employeeId });
-    res.success(contracts);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await contractService.listContracts({ employeeId }, pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

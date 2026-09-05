@@ -25,6 +25,7 @@ type Role =
   | "hr_payroll_manager"
   | "admin";
 type Status = "active" | "inactive";
+type EmployeeType = "full_time" | "part_time" | "contract" | "intern";
 
 interface Employee {
   id: string;
@@ -33,6 +34,7 @@ interface Employee {
   jobPosition: string | null;
   department: string | null;
   status: Status;
+  employeeType: EmployeeType;
   managerId: string | null;
   workingScheduleId: string | null;
   workLocation: string | null;
@@ -63,12 +65,20 @@ const EMPLOYEE_MODULE_ROLES: Role[] = [
   "admin",
 ];
 
+const EMPLOYEE_TYPE_OPTIONS: { value: EmployeeType; label: string }[] = [
+  { value: "full_time", label: "Full-Time" },
+  { value: "part_time", label: "Part-Time" },
+  { value: "contract", label: "Contract" },
+  { value: "intern", label: "Intern" },
+];
+
 interface FormState {
   fullName: string;
   workEmail: string;
   jobPosition: string;
   department: string;
   status: Status;
+  employeeType: EmployeeType;
   managerId: string;
   workingScheduleId: string;
   workLocation: string;
@@ -89,6 +99,7 @@ function emptyForm(): FormState {
     jobPosition: "",
     department: "",
     status: "active",
+    employeeType: "full_time",
     managerId: "",
     workingScheduleId: "",
     workLocation: "",
@@ -110,6 +121,7 @@ function toFormState(employee: Employee): FormState {
     jobPosition: employee.jobPosition ?? "",
     department: employee.department ?? "",
     status: employee.status,
+    employeeType: employee.employeeType,
     managerId: employee.managerId ?? "",
     workingScheduleId: employee.workingScheduleId ?? "",
     workLocation: employee.workLocation ?? "",
@@ -131,6 +143,7 @@ function buildPayload(form: FormState) {
     jobPosition: form.jobPosition || null,
     department: form.department || null,
     status: form.status,
+    employeeType: form.employeeType,
     managerId: form.managerId || null,
     workingScheduleId: form.workingScheduleId || null,
     workLocation: form.workLocation || null,
@@ -176,9 +189,9 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
     setIsLoading(true);
     try {
       const [employeesRes, schedulesRes] = await Promise.all([
-        api.get<{ data: Employee[] }>("/employees"),
+        api.get<{ data: Employee[] }>("/employees", { params: { limit: 100 } }),
         api
-          .get<{ data: WorkingSchedule[] }>("/working-schedules")
+          .get<{ data: WorkingSchedule[] }>("/working-schedules", { params: { limit: 100 } })
           .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
       ]);
       setAllEmployees(employeesRes.data.data);
@@ -468,6 +481,13 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   value={form.jobPosition}
                   disabled={readOnly}
                   onChange={(e) => setField("jobPosition", e.target.value)}
+                />
+                <Select
+                  label="Employee Type"
+                  options={EMPLOYEE_TYPE_OPTIONS}
+                  value={form.employeeType}
+                  disabled={readOnly}
+                  onChange={(e) => setField("employeeType", e.target.value as EmployeeType)}
                 />
                 <Select
                   label="Manager"

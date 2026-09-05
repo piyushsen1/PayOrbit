@@ -12,3 +12,4 @@ export * from './Toast';
 export * from './Skeleton';
 export * from './EmptyState';
 export * from './Avatar';
+export * from './Pagination';

@@ -13,6 +13,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -79,6 +80,8 @@ function ContractsPageContent() {
 
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -88,10 +91,13 @@ function ContractsPageContent() {
     setIsLoading(true);
     try {
       const [contractsRes, employeesRes] = await Promise.all([
-        api.get<{ data: Contract[] }>('/contracts', { params: employeeIdFilter ? { employeeId: employeeIdFilter } : {} }),
-        api.get<{ data: Employee[] }>('/employees'),
+        api.get<{ data: Contract[]; meta: PaginationMeta }>('/contracts', {
+          params: { ...(employeeIdFilter ? { employeeId: employeeIdFilter } : {}), page },
+        }),
+        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
       ]);
       setContracts(contractsRes.data.data);
+      setMeta(contractsRes.data.meta);
       setEmployees(employeesRes.data.data);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -103,7 +109,7 @@ function ContractsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeIdFilter, showToast]);
+  }, [employeeIdFilter, showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -184,6 +190,8 @@ function ContractsPageContent() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

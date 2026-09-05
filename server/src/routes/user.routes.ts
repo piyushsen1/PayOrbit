@@ -4,12 +4,14 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole, UserStatus } from '../entities/User';
+import { paginationQuerySchema } from '../utils/pagination';
 import { listUsersHandler, createUserHandler, updateUserHandler } from '../controllers/user-admin.controller';
 
 const router = Router();
 
 const roleEnum = z.nativeEnum(UserRole);
 const statusEnum = z.nativeEnum(UserStatus);
+const listQuerySchema = z.object({ query: z.object({ role: roleEnum.optional(), ...paginationQuerySchema }) });
 
 const createUserSchema = z.object({
   body: z.object({
@@ -38,13 +40,19 @@ const updateUserSchema = z.object({
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [employee, hr_manager, hr_payroll_user, hr_payroll_manager, admin]
  *     responses:
  *       200:
  *         description: List of user accounts.
  *       403:
  *         description: Caller is not an admin.
  */
-router.get('/', authGuard, roleGuard(UserRole.ADMIN), listUsersHandler);
+router.get('/', authGuard, roleGuard(UserRole.ADMIN), validate(listQuerySchema), listUsersHandler);
 
 /**
  * @openapi

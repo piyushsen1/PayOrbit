@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import * as salaryStructureService from '../services/salary-structure.service';
+import { parsePagination } from '../utils/pagination';
 
 export async function listSalaryStructuresHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const structures = await salaryStructureService.listSalaryStructures();
-    res.success(structures);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await salaryStructureService.listSalaryStructures(pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

@@ -4,6 +4,7 @@ import { getLinkedEmployeeId } from '../services/auth.service';
 import { UserRole } from '../entities/User';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination } from '../utils/pagination';
 
 const HR_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
 
@@ -15,9 +16,10 @@ export async function listAttendanceHandler(req: Request, res: Response, next: N
 
     // Employees (non-HR) only ever see their own attendance, regardless of what they pass in the query.
     const employeeId = isHr ? queryEmployeeId : await getLinkedEmployeeId(req.user!.sub);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
 
-    const records = await attendanceService.listAttendance({ employeeId, date });
-    res.success(records);
+    const { items, meta } = await attendanceService.listAttendance({ employeeId, date }, pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }
@@ -54,6 +56,17 @@ export async function deleteAttendanceHandler(req: Request, res: Response, next:
   try {
     await attendanceService.deleteAttendance(req.params.id);
     res.success(null);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getTodayAttendanceHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) throw new AppError(ErrorCodes.UNAUTHORIZED, 'Authentication required.', 401);
+    const employeeId = await getLinkedEmployeeId(req.user.sub);
+    const record = await attendanceService.getTodayAttendance(employeeId);
+    res.success(record);
   } catch (err) {
     next(err);
   }

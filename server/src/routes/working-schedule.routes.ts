@@ -6,6 +6,7 @@ import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
 import { WorkingScheduleStatus } from '../entities/WorkingSchedule';
 import { DayOfWeek } from '../entities/WorkingScheduleDay';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listWorkingSchedulesHandler,
   getWorkingScheduleHandler,
@@ -52,6 +53,7 @@ const updateWorkingScheduleSchema = z.object({
 });
 
 const idParamOnlySchema = z.object({ params: idParamSchema });
+const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
 
 /**
  * @openapi
@@ -67,7 +69,7 @@ const idParamOnlySchema = z.object({ params: idParamSchema });
  *       403:
  *         description: Caller lacks a manage role.
  */
-router.get('/', authGuard, roleGuard(...MANAGE_ROLES), listWorkingSchedulesHandler);
+router.get('/', authGuard, roleGuard(...MANAGE_ROLES), validate(listQuerySchema), listWorkingSchedulesHandler);
 
 /**
  * @openapi

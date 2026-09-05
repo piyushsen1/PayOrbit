@@ -24,18 +24,46 @@ function formatElapsed(ms: number): string {
 }
 
 /**
- * Self check-in/out quick action. `/auth/me` doesn't expose the caller's
- * linked employeeId, so this can't pre-fetch "am I already checked in" on
- * load — state starts fresh each session and is set from the check-in/out
- * response. A 404 (no linked employee) hides the widget for this session.
+ * Self check-in/out quick action. Loads today's real status from
+ * `GET /attendance/today` on mount so a page refresh (or a new tab) reflects
+ * what actually happened server-side, instead of always assuming "not
+ * checked in" — that mismatch used to make every click after a refresh 422
+ * with "Already checked in/out for today". A 404 (no linked employee) hides
+ * the widget for this session.
  */
 export function AttendanceWidget() {
   const { showToast } = useToast();
   const [available, setAvailable] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
+  const [completedToday, setCompletedToday] = useState(false);
   const [elapsedLabel, setElapsedLabel] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ data: AttendanceRecord | null }>('/attendance/today')
+      .then(({ data }) => {
+        if (cancelled) return;
+        const record = data.data;
+        if (record?.checkIn && record.checkOut) {
+          setCompletedToday(true);
+        } else if (record?.checkIn) {
+          setCheckInTime(new Date(record.checkIn));
+        }
+      })
+      .catch((err: AxiosError) => {
+        if (!cancelled && err.response?.status === 404) setAvailable(false);
+      })
+      .finally(() => {
+        if (!cancelled) setIsInitializing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!checkInTime) {
@@ -56,6 +84,7 @@ export function AttendanceWidget() {
       if (checkInTime) {
         await api.post<{ data: AttendanceRecord }>('/attendance/check-out');
         setCheckInTime(null);
+        setCompletedToday(true);
         showToast({ title: 'Checked out', variant: 'success' });
       } else {
         const { data } = await api.post<{ data: AttendanceRecord }>('/attendance/check-in');
@@ -78,7 +107,7 @@ export function AttendanceWidget() {
     }
   }
 
-  if (!available) return null;
+  if (!available || isInitializing) return null;
 
   return (
     <div className="flex items-center gap-2">
@@ -87,9 +116,13 @@ export function AttendanceWidget() {
         aria-hidden="true"
       />
       {checkInTime && <span className="text-xs text-[var(--text-tertiary)]">{elapsedLabel}</span>}
-      <Button variant="outline" size="sm" onClick={handleClick} isLoading={isSubmitting}>
-        {checkInTime ? 'Check Out' : 'Check In'}
-      </Button>
+      {completedToday ? (
+        <span className="text-xs text-[var(--text-tertiary)]">Checked out for today</span>
+      ) : (
+        <Button variant="outline" size="sm" onClick={handleClick} isLoading={isSubmitting}>
+          {checkInTime ? 'Check Out' : 'Check In'}
+        </Button>
+      )}
     </div>
   );
 }

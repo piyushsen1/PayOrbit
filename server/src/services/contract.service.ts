@@ -5,6 +5,7 @@ import { WorkingSchedule } from '../entities/WorkingSchedule';
 import { SalaryStructure } from '../entities/SalaryStructure';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const contractRepository = () => AppDataSource.getRepository(Contract);
 const employeeRepository = () => AppDataSource.getRepository(Employee);
@@ -59,12 +60,17 @@ async function assertNoRunningConflict(employeeId: string, endDate: string | nul
   }
 }
 
-export async function listContracts(filter?: { employeeId?: string }) {
-  const contracts = await contractRepository().find({
+export async function listContracts(
+  filter?: { employeeId?: string },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const [contracts, total] = await contractRepository().findAndCount({
     where: filter?.employeeId ? { employeeId: filter.employeeId } : {},
     order: { startDate: 'DESC' },
+    skip: pagination.skip,
+    take: pagination.take,
   });
-  return contracts.map(withStatus);
+  return { items: contracts.map(withStatus), meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getContract(id: string) {

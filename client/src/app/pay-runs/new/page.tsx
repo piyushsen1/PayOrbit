@@ -83,10 +83,12 @@ export default function NewPayRunPage() {
     setIsLoading(true);
     try {
       const [structuresRes, employeesRes, contractsRes, schedulesRes] = await Promise.all([
-        api.get<{ data: SalaryStructure[] }>('/salary-structures'),
-        api.get<{ data: Employee[] }>('/employees'),
-        api.get<{ data: Contract[] }>('/contracts'),
-        api.get<{ data: WorkingSchedule[] }>('/working-schedules').catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
+        api.get<{ data: SalaryStructure[] }>('/salary-structures', { params: { limit: 100 } }),
+        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+        api.get<{ data: Contract[] }>('/contracts', { params: { limit: 100 } }),
+        api
+          .get<{ data: WorkingSchedule[] }>('/working-schedules', { params: { limit: 100 } })
+          .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
       ]);
       setStructures(structuresRes.data.data.filter((s) => s.active));
       setEmployees(employeesRes.data.data);

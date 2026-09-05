@@ -17,6 +17,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 type Status = 'active' | 'inactive';
@@ -63,6 +64,8 @@ export default function UserManagementPage() {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [users, setUsers] = useState<UserAccount[]>([]);
+  const [usersMeta, setUsersMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -78,11 +81,14 @@ export default function UserManagementPage() {
     setIsLoading(true);
     try {
       const [employeesRes, usersRes] = await Promise.all([
-        api.get<{ data: Employee[] }>('/employees'),
-        api.get<{ data: UserAccount[] }>('/users'),
+        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+        api.get<{ data: UserAccount[]; meta: PaginationMeta }>('/users', {
+          params: { page, role: roleFilter || undefined },
+        }),
       ]);
       setEmployees(employeesRes.data.data);
       setUsers(usersRes.data.data);
+      setUsersMeta(usersRes.data.meta);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
@@ -93,11 +99,17 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, page, roleFilter]);
 
   useEffect(() => {
     if (isAdmin) loadData();
   }, [isAdmin, loadData]);
+
+  // Role is filtered server-side, so its result set (and page count) can change —
+  // land back on page 1 rather than risk showing an out-of-range empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [roleFilter]);
 
   function startCreate() {
     setEditingId(null);
@@ -172,11 +184,11 @@ export default function UserManagementPage() {
     );
   }
 
+  // Role is filtered server-side (see loadData). Search is client-side over
+  // the current page only, same as the other list pages in this app.
   const filteredUsers = users.filter((u) => {
-    const matchesRole = !roleFilter || u.role === roleFilter;
     const haystack = `${u.employee?.fullName ?? ''} ${u.email}`.toLowerCase();
-    const matchesSearch = !search || haystack.includes(search.toLowerCase());
-    return matchesRole && matchesSearch;
+    return !search || haystack.includes(search.toLowerCase());
   });
 
   return (
@@ -255,6 +267,8 @@ export default function UserManagementPage() {
               </TableBody>
             </Table>
           )}
+
+          {usersMeta && <Pagination meta={usersMeta} onPageChange={setPage} />}
 
           <p className="text-xs text-[var(--text-tertiary)]">Select a user to edit access, or create a new user.</p>
           <p className="text-xs text-[var(--text-tertiary)]">

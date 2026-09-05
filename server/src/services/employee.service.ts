@@ -3,6 +3,7 @@ import { Employee, EmployeeStatus, EmployeeType } from '../entities/Employee';
 import { WorkingSchedule } from '../entities/WorkingSchedule';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const employeeRepository = () => AppDataSource.getRepository(Employee);
 const workingScheduleRepository = () => AppDataSource.getRepository(WorkingSchedule);
@@ -41,8 +42,13 @@ async function assertWorkingScheduleExists(workingScheduleId: string) {
   }
 }
 
-export async function listEmployees() {
-  return employeeRepository().find({ order: { fullName: 'ASC' } });
+export async function listEmployees(pagination: PaginationParams = parsePagination({})) {
+  const [items, total] = await employeeRepository().findAndCount({
+    order: { fullName: 'ASC' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getEmployee(id: string) {

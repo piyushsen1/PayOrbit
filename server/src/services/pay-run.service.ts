@@ -12,6 +12,7 @@ import { ErrorCodes } from '../utils/error-codes';
 import { generatePayslipPdf } from '../utils/payslip-pdf';
 import { isEmailConfigured, sendPayslipEmail } from './email.service';
 import { evaluateFormula, type FormulaContext } from '../utils/formula-evaluator';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const payRunRepository = () => AppDataSource.getRepository(PayRun);
 const payslipRepository = () => AppDataSource.getRepository(Payslip);
@@ -50,9 +51,14 @@ async function resolveApplicableContract(employeeId: string, periodStart: string
   return contracts[0] ?? null;
 }
 
-export async function listPayRuns() {
-  const payRuns = await payRunRepository().find({ relations: ['payslips'], order: { periodStart: 'DESC' } });
-  return payRuns.map(withCounts);
+export async function listPayRuns(pagination: PaginationParams = parsePagination({})) {
+  const [payRuns, total] = await payRunRepository().findAndCount({
+    relations: ['payslips'],
+    order: { periodStart: 'DESC' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+  return { items: payRuns.map(withCounts), meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getPayRun(id: string) {

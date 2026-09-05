@@ -5,6 +5,7 @@ import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
 import { TimeOffTypeStatus, TimeOffUnit } from '../entities/TimeOffType';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listTimeOffTypesHandler,
   getTimeOffTypeHandler,
@@ -22,6 +23,7 @@ const approvalRoleEnum = z.enum([UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, 
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
+const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
 
 const createTimeOffTypeSchema = z.object({
   body: z.object({
@@ -64,7 +66,7 @@ const updateTimeOffTypeSchema = z.object({
  *       403:
  *         description: Caller lacks a manage role.
  */
-router.get('/', authGuard, roleGuard(...MANAGE_ROLES), listTimeOffTypesHandler);
+router.get('/', authGuard, roleGuard(...MANAGE_ROLES), validate(listQuerySchema), listTimeOffTypesHandler);
 
 /**
  * @openapi

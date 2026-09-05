@@ -13,6 +13,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -46,6 +47,8 @@ export default function WorkingSchedulesPage() {
   const router = useRouter();
 
   const [schedules, setSchedules] = useState<WorkingSchedule[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -54,8 +57,11 @@ export default function WorkingSchedulesPage() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data } = await api.get<{ data: WorkingSchedule[] }>('/working-schedules');
+      const { data } = await api.get<{ data: WorkingSchedule[]; meta: PaginationMeta }>('/working-schedules', {
+        params: { page },
+      });
       setSchedules(data.data);
+      setMeta(data.meta);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
@@ -66,7 +72,7 @@ export default function WorkingSchedulesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -141,6 +147,8 @@ export default function WorkingSchedulesPage() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

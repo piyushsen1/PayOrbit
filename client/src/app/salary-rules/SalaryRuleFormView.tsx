@@ -88,7 +88,7 @@ export function SalaryRuleFormView({ mode, ruleId, initialStructureId }: SalaryR
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const structuresRes = await api.get<{ data: SalaryStructure[] }>('/salary-structures');
+      const structuresRes = await api.get<{ data: SalaryStructure[] }>('/salary-structures', { params: { limit: 100 } });
       setStructures(structuresRes.data.data);
 
       if (mode === 'edit' && ruleId) {

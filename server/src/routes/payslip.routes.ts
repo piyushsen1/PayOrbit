@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listPayslipsHandler,
   getPayslipHandler,
@@ -23,6 +24,7 @@ const listQuerySchema = z.object({
   query: z.object({
     employeeId: z.string().uuid().optional(),
     payRunId: z.string().uuid().optional(),
+    ...paginationQuerySchema,
   }),
 });
 

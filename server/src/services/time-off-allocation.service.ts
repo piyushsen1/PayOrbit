@@ -5,6 +5,7 @@ import { Employee } from '../entities/Employee';
 import { TimeOffType } from '../entities/TimeOffType';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const allocationRepository = () => AppDataSource.getRepository(TimeOffAllocation);
 const requestRepository = () => AppDataSource.getRepository(TimeOffRequest);
@@ -44,13 +45,19 @@ async function withBalance(allocation: TimeOffAllocation) {
   return { ...allocation, taken, remaining: Number((allocated - taken).toFixed(2)) };
 }
 
-export async function listAllocations(filter?: { employeeId?: string }) {
-  const allocations = await allocationRepository().find({
+export async function listAllocations(
+  filter?: { employeeId?: string },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const [allocations, total] = await allocationRepository().findAndCount({
     where: filter?.employeeId ? { employeeId: filter.employeeId } : {},
     relations: ['employee', 'timeOffType'],
     order: { createdAt: 'DESC' },
+    skip: pagination.skip,
+    take: pagination.take,
   });
-  return Promise.all(allocations.map(withBalance));
+  const items = await Promise.all(allocations.map(withBalance));
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getAllocation(id: string) {

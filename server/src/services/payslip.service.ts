@@ -3,18 +3,25 @@ import { Payslip, PayslipStatus } from '../entities/Payslip';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
 import { generatePayslipPdf } from '../utils/payslip-pdf';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const payslipRepository = () => AppDataSource.getRepository(Payslip);
 
-export async function listPayslips(filter?: { employeeId?: string; payRunId?: string }) {
-  return payslipRepository().find({
+export async function listPayslips(
+  filter?: { employeeId?: string; payRunId?: string },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const [items, total] = await payslipRepository().findAndCount({
     where: {
       ...(filter?.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter?.payRunId ? { payRunId: filter.payRunId } : {}),
     },
     relations: ['employee', 'payRun', 'payRun.salaryStructure'],
     order: { createdAt: 'DESC' },
+    skip: pagination.skip,
+    take: pagination.take,
   });
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getPayslip(id: string) {

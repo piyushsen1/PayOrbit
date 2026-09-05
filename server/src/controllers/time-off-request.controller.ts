@@ -4,6 +4,7 @@ import { getLinkedEmployeeId } from '../services/auth.service';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
 import { UserRole } from '../entities/User';
+import { parsePagination } from '../utils/pagination';
 
 const HR_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
 
@@ -12,8 +13,9 @@ export async function listRequestsHandler(req: Request, res: Response, next: Nex
     const isHr = !!req.user && HR_ROLES.includes(req.user.role);
     const queryEmployeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
     const employeeId = isHr ? queryEmployeeId : await getLinkedEmployeeId(req.user!.sub);
-    const requests = await requestService.listRequests({ employeeId });
-    res.success(requests);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await requestService.listRequests({ employeeId }, pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

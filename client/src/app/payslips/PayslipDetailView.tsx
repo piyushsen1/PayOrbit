@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { downloadFile } from '@/lib/downloadFile';
+import { WARNING_TYPE_LABELS } from '@/lib/payslipWarnings';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -45,6 +46,7 @@ interface Payslip {
   grossTotal: string | null;
   netTotal: string | null;
   warning: string | null;
+  warningTypes: string[] | null;
   status: 'draft' | 'validated' | 'paid';
   lines: PayslipLine[];
 }
@@ -82,7 +84,9 @@ export function PayslipDetailView({ payslipId }: { payslipId: string }) {
     try {
       const [payslipRes, structuresRes] = await Promise.all([
         api.get<{ data: Payslip }>(`/payslips/${payslipId}`),
-        api.get<{ data: SalaryStructure[] }>('/salary-structures').catch(() => ({ data: { data: [] as SalaryStructure[] } })),
+        api
+          .get<{ data: SalaryStructure[] }>('/salary-structures', { params: { limit: 100 } })
+          .catch(() => ({ data: { data: [] as SalaryStructure[] } })),
       ]);
       setPayslip(payslipRes.data.data);
       setStructures(structuresRes.data.data);
@@ -214,9 +218,18 @@ export function PayslipDetailView({ payslipId }: { payslipId: string }) {
           </div>
 
           {payslip.warning && (
-            <p className="rounded-2xl bg-[var(--status-warning-bg)] px-4 py-3 text-sm text-[var(--status-warning-fg)]">
-              {payslip.warning}
-            </p>
+            <div className="flex flex-col gap-2 rounded-2xl bg-[var(--status-warning-bg)] px-4 py-3 text-sm text-[var(--status-warning-fg)]">
+              {payslip.warningTypes && payslip.warningTypes.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {payslip.warningTypes.map((code) => (
+                    <Badge key={code} variant="warning">
+                      {WARNING_TYPE_LABELS[code] ?? code}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p>{payslip.warning}</p>
+            </div>
           )}
 
           <div className="grid grid-cols-3 gap-4">

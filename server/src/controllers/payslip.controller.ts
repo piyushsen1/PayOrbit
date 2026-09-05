@@ -1,12 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import * as payslipService from '../services/payslip.service';
+import { parsePagination } from '../utils/pagination';
 
 export async function listPayslipsHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
     const payRunId = typeof req.query.payRunId === 'string' ? req.query.payRunId : undefined;
-    const payslips = await payslipService.listPayslips({ employeeId, payRunId });
-    res.success(payslips);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await payslipService.listPayslips({ employeeId, payRunId }, pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

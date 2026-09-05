@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { downloadFile } from '@/lib/downloadFile';
+import { WARNING_TYPE_LABELS } from '@/lib/payslipWarnings';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -30,6 +31,7 @@ interface Payslip {
   grossTotal: string | null;
   netTotal: string | null;
   warning: string | null;
+  warningTypes: string[] | null;
   status: 'draft' | 'validated' | 'paid';
 }
 
@@ -246,7 +248,15 @@ export function PayRunProcessingView({ payRunId }: { payRunId: string }) {
             <TableRow key={p.id} className="cursor-pointer" onClick={() => router.push(`/payslips/${p.id}`)}>
               <TableCell className="font-medium">{p.employee?.fullName ?? '—'}</TableCell>
               <TableCell>
-                {p.warning ? (
+                {p.warningTypes && p.warningTypes.length > 0 ? (
+                  <div className="flex flex-wrap gap-1" title={p.warning ?? undefined}>
+                    {p.warningTypes.map((code) => (
+                      <Badge key={code} variant="warning">
+                        {WARNING_TYPE_LABELS[code] ?? code}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : p.warning ? (
                   <Badge variant="warning" title={p.warning}>
                     Warning
                   </Badge>

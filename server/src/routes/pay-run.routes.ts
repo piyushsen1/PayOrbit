@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listPayRunsHandler,
   getPayRunHandler,
@@ -23,6 +24,7 @@ const DELETE_ROLES = [UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
+const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
 
 const createPayRunSchema = z.object({
   body: z.object({
@@ -48,7 +50,7 @@ const createPayRunSchema = z.object({
  *       403:
  *         description: Caller lacks payroll access.
  */
-router.get('/', authGuard, roleGuard(...READ_WRITE_ROLES), listPayRunsHandler);
+router.get('/', authGuard, roleGuard(...READ_WRITE_ROLES), validate(listQuerySchema), listPayRunsHandler);
 
 /**
  * @openapi

@@ -8,7 +8,6 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -23,6 +22,7 @@ const ATTENDANCE_MODULE_ROLES: Role[] = ['hr_manager', 'hr_payroll_user', 'hr_pa
 
 const STATUS_OPTIONS = [
   { value: 'present', label: 'Present' },
+  { value: 'late', label: 'Late' },
   { value: 'absent', label: 'Absent' },
 ];
 
@@ -39,7 +39,7 @@ interface Attendance {
   date: string;
   checkIn: string | null;
   checkOut: string | null;
-  status: 'present' | 'absent';
+  status: 'present' | 'late' | 'absent';
   notes: string | null;
   workedHours: number;
   overtime: number;
@@ -76,7 +76,7 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
-  const [status, setStatus] = useState<'present' | 'absent'>('present');
+  const [status, setStatus] = useState<'present' | 'late' | 'absent'>('present');
   const [notes, setNotes] = useState('');
   const [workedHours, setWorkedHours] = useState<number | null>(null);
   const [overtime, setOvertime] = useState<number | null>(null);
@@ -91,7 +91,7 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const employeesRes = await api.get<{ data: Employee[] }>('/employees');
+      const employeesRes = await api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } });
       setEmployees(employeesRes.data.data);
 
       if (mode === 'edit' && attendanceId) {
@@ -251,7 +251,7 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
               label="Status"
               options={STATUS_OPTIONS}
               value={status}
-              onChange={(e) => setStatus(e.target.value as 'present' | 'absent')}
+              onChange={(e) => setStatus(e.target.value as 'present' | 'late' | 'absent')}
             />
             {mode === 'edit' && (
               <div className="grid grid-cols-2 gap-4">

@@ -13,6 +13,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -52,6 +53,8 @@ export default function SalaryStructuresPage() {
 
   const [structures, setStructures] = useState<SalaryStructure[]>([]);
   const [employeeCounts, setEmployeeCounts] = useState<Map<string, number>>(new Map());
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -62,10 +65,13 @@ export default function SalaryStructuresPage() {
     setIsLoading(true);
     try {
       const [structuresRes, contractsRes] = await Promise.all([
-        api.get<{ data: SalaryStructure[] }>('/salary-structures'),
-        api.get<{ data: Contract[] }>('/contracts').catch(() => ({ data: { data: [] as Contract[] } })),
+        api.get<{ data: SalaryStructure[]; meta: PaginationMeta }>('/salary-structures', { params: { page } }),
+        api
+          .get<{ data: Contract[] }>('/contracts', { params: { limit: 100 } })
+          .catch(() => ({ data: { data: [] as Contract[] } })),
       ]);
       setStructures(structuresRes.data.data);
+      setMeta(structuresRes.data.meta);
 
       const counts = new Map<string, Set<string>>();
       for (const c of contractsRes.data.data) {
@@ -84,7 +90,7 @@ export default function SalaryStructuresPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, page]);
 
   useEffect(() => {
     if (canView) loadData();
@@ -157,6 +163,8 @@ export default function SalaryStructuresPage() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

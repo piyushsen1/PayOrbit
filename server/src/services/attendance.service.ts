@@ -4,6 +4,7 @@ import { Employee } from '../entities/Employee';
 import { DayOfWeek, WorkingScheduleDay } from '../entities/WorkingScheduleDay';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const attendanceRepository = () => AppDataSource.getRepository(Attendance);
 const employeeRepository = () => AppDataSource.getRepository(Employee);
@@ -103,16 +104,22 @@ export async function getOvertimeRollup(filter: { periodStart: string; periodEnd
   };
 }
 
-export async function listAttendance(filter?: { employeeId?: string; date?: string }) {
-  const records = await attendanceRepository().find({
+export async function listAttendance(
+  filter?: { employeeId?: string; date?: string },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const [records, total] = await attendanceRepository().findAndCount({
     where: {
       ...(filter?.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter?.date ? { date: filter.date } : {}),
     },
     relations: ['employee'],
     order: { date: 'DESC' },
+    skip: pagination.skip,
+    take: pagination.take,
   });
-  return Promise.all(records.map((r) => withWorkedHoursAndOvertime(r, r.employee)));
+  const items = await Promise.all(records.map((r) => withWorkedHoursAndOvertime(r, r.employee)));
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getAttendance(id: string) {
@@ -165,6 +172,15 @@ export async function deleteAttendance(id: string) {
   if (!result.affected) {
     throw new AppError(ErrorCodes.NOT_FOUND, 'Attendance record not found.', 404);
   }
+}
+
+/** The caller's own attendance record for today, or null if they haven't checked in yet — lets the self-service widget know its real state on load instead of assuming "not checked in". */
+export async function getTodayAttendance(employeeId: string) {
+  const date = todayIsoDate();
+  const record = await attendanceRepository().findOne({ where: { employeeId, date } });
+  if (!record) return null;
+  const employee = await employeeRepository().findOne({ where: { id: employeeId } });
+  return withWorkedHoursAndOvertime(record, employee);
 }
 
 export async function checkIn(employeeId: string) {

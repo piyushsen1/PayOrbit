@@ -6,6 +6,7 @@ import { Employee } from '../entities/Employee';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
 import { toPublicUser } from './auth.service';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const SALT_ROUNDS = 10;
 
@@ -18,9 +19,18 @@ function generateTemporaryPassword() {
   return randomBytes(9).toString('base64url');
 }
 
-export async function listUsersForAdmin() {
-  const users = await userRepository().find({ relations: ['employee'], order: { createdAt: 'DESC' } });
-  return users.map(toPublicUser);
+export async function listUsersForAdmin(
+  filter?: { role?: UserRole },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const [users, total] = await userRepository().findAndCount({
+    where: filter?.role ? { role: filter.role } : {},
+    relations: ['employee'],
+    order: { createdAt: 'DESC' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+  return { items: users.map(toPublicUser), meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function createUserForAdmin(input: {

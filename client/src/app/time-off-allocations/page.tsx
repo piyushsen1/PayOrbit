@@ -14,6 +14,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -47,6 +48,8 @@ export default function TimeOffAllocationsPage() {
 
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [employeeFilter, setEmployeeFilter] = useState('');
 
@@ -55,14 +58,17 @@ export default function TimeOffAllocationsPage() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params: Record<string, string> = {};
+      const params: Record<string, string | number> = { page };
       if (employeeFilter) params.employeeId = employeeFilter;
 
       const [allocationsRes, employeesRes] = await Promise.all([
-        api.get<{ data: Allocation[] }>('/time-off-allocations', { params }),
-        isHr ? api.get<{ data: Employee[] }>('/employees') : Promise.resolve({ data: { data: [] as Employee[] } }),
+        api.get<{ data: Allocation[]; meta: PaginationMeta }>('/time-off-allocations', { params }),
+        isHr
+          ? api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } })
+          : Promise.resolve({ data: { data: [] as Employee[] } }),
       ]);
       setAllocations(allocationsRes.data.data);
+      setMeta(allocationsRes.data.meta);
       setEmployees(employeesRes.data.data);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -74,7 +80,7 @@ export default function TimeOffAllocationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeFilter, isHr, showToast]);
+  }, [employeeFilter, isHr, showToast, page]);
 
   useEffect(() => {
     if (user) loadData();
@@ -144,6 +150,8 @@ export default function TimeOffAllocationsPage() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

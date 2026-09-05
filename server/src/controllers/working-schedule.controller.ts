@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import * as workingScheduleService from '../services/working-schedule.service';
+import { parsePagination } from '../utils/pagination';
 
 export async function listWorkingSchedulesHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const schedules = await workingScheduleService.listWorkingSchedules();
-    res.success(schedules);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await workingScheduleService.listWorkingSchedules(pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

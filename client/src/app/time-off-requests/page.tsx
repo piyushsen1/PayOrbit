@@ -14,6 +14,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -62,6 +63,8 @@ function TimeOffRequestsPageContent() {
 
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [employeeFilter, setEmployeeFilter] = useState(searchParams.get('employeeId') ?? '');
   const [decidingId, setDecidingId] = useState<string | null>(null);
@@ -71,14 +74,17 @@ function TimeOffRequestsPageContent() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params: Record<string, string> = {};
+      const params: Record<string, string | number> = { page };
       if (employeeFilter) params.employeeId = employeeFilter;
 
       const [requestsRes, employeesRes] = await Promise.all([
-        api.get<{ data: TimeOffRequest[] }>('/time-off-requests', { params }),
-        isHr ? api.get<{ data: Employee[] }>('/employees') : Promise.resolve({ data: { data: [] as Employee[] } }),
+        api.get<{ data: TimeOffRequest[]; meta: PaginationMeta }>('/time-off-requests', { params }),
+        isHr
+          ? api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } })
+          : Promise.resolve({ data: { data: [] as Employee[] } }),
       ]);
       setRequests(requestsRes.data.data);
+      setMeta(requestsRes.data.meta);
       setEmployees(employeesRes.data.data);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -90,7 +96,7 @@ function TimeOffRequestsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeFilter, isHr, showToast]);
+  }, [employeeFilter, isHr, showToast, page]);
 
   useEffect(() => {
     if (user) loadData();
@@ -201,6 +207,8 @@ function TimeOffRequestsPageContent() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import * as payRunService from '../services/pay-run.service';
+import { parsePagination } from '../utils/pagination';
 
 export async function listPayRunsHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const payRuns = await payRunService.listPayRuns();
-    res.success(payRuns);
+    const pagination = parsePagination(req.query as { page?: number; limit?: number });
+    const { items, meta } = await payRunService.listPayRuns(pagination);
+    res.success(items, 200, meta);
   } catch (err) {
     next(err);
   }

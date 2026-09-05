@@ -2,12 +2,19 @@ import { AppDataSource } from '../config/data-source';
 import { SalaryStructure } from '../entities/SalaryStructure';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const salaryStructureRepository = () => AppDataSource.getRepository(SalaryStructure);
 
-export async function listSalaryStructures() {
-  const structures = await salaryStructureRepository().find({ relations: ['rules'], order: { name: 'ASC' } });
-  return structures.map(({ rules, ...rest }) => ({ ...rest, rulesCount: rules.length }));
+export async function listSalaryStructures(pagination: PaginationParams = parsePagination({})) {
+  const [structures, total] = await salaryStructureRepository().findAndCount({
+    relations: ['rules'],
+    order: { name: 'ASC' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+  const items = structures.map(({ rules, ...rest }) => ({ ...rest, rulesCount: rules.length }));
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getSalaryStructure(id: string) {

@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
+import { paginationQuerySchema } from '../utils/pagination';
 import {
   listContractsHandler,
   getContractHandler,
@@ -21,7 +22,7 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
 
 const listQuerySchema = z.object({
-  query: z.object({ employeeId: z.string().uuid().optional() }),
+  query: z.object({ employeeId: z.string().uuid().optional(), ...paginationQuerySchema }),
 });
 
 const createContractSchema = z.object({

@@ -3,6 +3,7 @@ import { SalaryRule, SalaryRuleCategory, SalaryRuleComputationMethod } from '../
 import { SalaryStructure } from '../entities/SalaryStructure';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { parsePagination, buildPaginationMeta, type PaginationParams } from '../utils/pagination';
 
 const salaryRuleRepository = () => AppDataSource.getRepository(SalaryRule);
 const salaryStructureRepository = () => AppDataSource.getRepository(SalaryStructure);
@@ -31,11 +32,17 @@ function assertComputationInputValid(computationMethod: SalaryRuleComputationMet
   }
 }
 
-export async function listSalaryRules(filter?: { salaryStructureId?: string }) {
-  return salaryRuleRepository().find({
+export async function listSalaryRules(
+  filter?: { salaryStructureId?: string },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const [items, total] = await salaryRuleRepository().findAndCount({
     where: filter?.salaryStructureId ? { salaryStructureId: filter.salaryStructureId } : {},
     order: { sequence: 'ASC' },
+    skip: pagination.skip,
+    take: pagination.take,
   });
+  return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
 export async function getSalaryRule(id: string) {

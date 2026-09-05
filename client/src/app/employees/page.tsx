@@ -15,6 +15,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 type Status = 'active' | 'inactive';
@@ -52,6 +53,8 @@ export default function EmployeesPage() {
   const router = useRouter();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [view, setView] = useState<ViewMode>('kanban');
@@ -61,8 +64,9 @@ export default function EmployeesPage() {
   const loadEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data } = await api.get<{ data: Employee[] }>('/employees');
+      const { data } = await api.get<{ data: Employee[]; meta: PaginationMeta }>('/employees', { params: { page } });
       setEmployees(data.data);
+      setMeta(data.meta);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
@@ -73,7 +77,7 @@ export default function EmployeesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, page]);
 
   useEffect(() => {
     if (canView) loadEmployees();
@@ -195,6 +199,8 @@ export default function EmployeesPage() {
           </TableBody>
         </Table>
       )}
+
+      {meta && <Pagination meta={meta} onPageChange={setPage} />}
     </Container>
   );
 }

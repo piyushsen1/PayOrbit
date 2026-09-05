@@ -117,9 +117,13 @@ export function ContractFormView({ mode, contractId }: ContractFormViewProps) {
     setIsLoading(true);
     try {
       const [employeesRes, schedulesRes, structuresRes] = await Promise.all([
-        api.get<{ data: Employee[] }>('/employees'),
-        api.get<{ data: WorkingSchedule[] }>('/working-schedules').catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
-        api.get<{ data: SalaryStructure[] }>('/salary-structures').catch(() => ({ data: { data: [] as SalaryStructure[] } })),
+        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+        api
+          .get<{ data: WorkingSchedule[] }>('/working-schedules', { params: { limit: 100 } })
+          .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
+        api
+          .get<{ data: SalaryStructure[] }>('/salary-structures', { params: { limit: 100 } })
+          .catch(() => ({ data: { data: [] as SalaryStructure[] } })),
       ]);
       setEmployees(employeesRes.data.data);
       setWorkingSchedules(schedulesRes.data.data);

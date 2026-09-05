@@ -9,6 +9,8 @@ import { Contract } from '../entities/Contract';
 import { Attendance, AttendanceStatus } from '../entities/Attendance';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
+import { generatePayslipPdf } from '../utils/payslip-pdf';
+import { isEmailConfigured, sendPayslipEmail } from './email.service';
 
 const payRunRepository = () => AppDataSource.getRepository(PayRun);
 const payslipRepository = () => AppDataSource.getRepository(Payslip);
@@ -153,19 +155,12 @@ async function computeOnePayslip(payslip: Payslip, rules: SalaryRule[], periodSt
     return payslip;
   }
 
-  const workedDays = await attendanceRepository().count({
-    where: {
-      employeeId: payslip.employeeId,
-      status: AttendanceStatus.PRESENT,
-    },
-  });
   const workedDaysInPeriod = await attendanceRepository()
     .createQueryBuilder('attendance')
     .where('attendance.employee_id = :employeeId', { employeeId: payslip.employeeId })
     .andWhere('attendance.status = :status', { status: AttendanceStatus.PRESENT })
     .andWhere('attendance.date BETWEEN :periodStart AND :periodEnd', { periodStart, periodEnd })
     .getCount();
-  void workedDays;
   if (workedDaysInPeriod === 0) {
     warnings.push('No attendance records found for this period.');
   }
@@ -260,4 +255,45 @@ export async function markPayRunPaid(id: string) {
   await payslipRepository().update({ payRunId: id }, { status: PayslipStatus.PAID });
 
   return getPayRun(id);
+}
+
+/** Emails each payslip's PDF to its employee's work email. Fails fast if SMTP isn't configured, before sending any. */
+export async function sendPayslipsForPayRun(id: string) {
+  if (!isEmailConfigured()) {
+    throw new AppError(
+      ErrorCodes.EMAIL_NOT_CONFIGURED,
+      'Email sending is not configured (SMTP_HOST is unset) — set SMTP_* env vars to enable bulk payslip emails.',
+      422
+    );
+  }
+
+  const payRun = await payRunRepository().findOne({
+    where: { id },
+    relations: ['payslips', 'payslips.employee', 'payslips.lines', 'payslips.contract'],
+  });
+  if (!payRun) throw new AppError(ErrorCodes.NOT_FOUND, 'Pay run not found.', 404);
+  if (payRun.payslips.some((p) => p.basic === null)) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Compute all payslips before sending them.', 422);
+  }
+
+  let sent = 0;
+  const failures: Array<{ employeeId: string; error: string }> = [];
+  for (const payslip of payRun.payslips) {
+    const employee = payslip.employee;
+    try {
+      const pdf = await generatePayslipPdf({ ...payslip, payRun });
+      await sendPayslipEmail(
+        employee.workEmail,
+        `Payslip — ${payRun.name}`,
+        `Hi ${employee.fullName}, your payslip for ${payRun.name} is attached.`,
+        pdf,
+        `payslip-${payRun.name.replace(/\s+/g, '-')}-${employee.fullName.replace(/\s+/g, '-')}.pdf`
+      );
+      sent += 1;
+    } catch (err) {
+      failures.push({ employeeId: employee.id, error: err instanceof Error ? err.message : 'Unknown error' });
+    }
+  }
+
+  return { sent, failed: failures.length, failures };
 }

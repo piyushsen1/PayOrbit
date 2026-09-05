@@ -10,6 +10,9 @@ import contractRoutes from './contract.routes';
 import attendanceRoutes from './attendance.routes';
 import timeOffAllocationRoutes from './time-off-allocation.routes';
 import timeOffRequestRoutes from './time-off-request.routes';
+import payRunRoutes from './pay-run.routes';
+import payslipRoutes from './payslip.routes';
+import dashboardRoutes from './dashboard.routes';
 
 const router = Router();
 
@@ -24,5 +27,8 @@ router.use('/contracts', contractRoutes);
 router.use('/attendance', attendanceRoutes);
 router.use('/time-off-allocations', timeOffAllocationRoutes);
 router.use('/time-off-requests', timeOffRequestRoutes);
+router.use('/pay-runs', payRunRoutes);
+router.use('/payslips', payslipRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 export default router;

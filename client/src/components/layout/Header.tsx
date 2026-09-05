@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Container } from './Container';
+import { NavDropdown } from './NavDropdown';
+import { AttendanceWidget } from './AttendanceWidget';
 
 /** Per root CLAUDE.md roles table: HR Manager and every payroll/admin role above it. */
 const HR_PAYROLL_ROLES = ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'];
@@ -30,52 +32,51 @@ export function Header() {
           <Link href="/" className="text-lg font-semibold text-[var(--text-primary)]">
             PayOrbit
           </Link>
-          {!isLoading && hasHrAccess && (
-            <nav className="flex items-center gap-4">
-              <Link
-                href="/employees"
-                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
-              >
-                Employees
-              </Link>
-              <Link
-                href="/contracts"
-                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
-              >
-                Contracts
-              </Link>
-              <Link
-                href="/working-schedules"
-                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
-              >
-                Working Schedules
-              </Link>
-              <Link
-                href="/time-off-types"
-                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
-              >
-                Time Off Types
-              </Link>
-            </nav>
-          )}
-          {!isLoading && hasPayrollConfigAccess && (
-            <nav className="flex items-center gap-4">
-              <Link
-                href="/salary-structures"
-                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
-              >
-                Salary Structures
-              </Link>
-              <Link
-                href="/salary-rules"
-                className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
-              >
-                Salary Rules
-              </Link>
+          {!isLoading && user && (
+            <nav className="flex items-center gap-5">
+              {hasHrAccess && (
+                <>
+                  <NavDropdown
+                    label="Employees"
+                    items={[
+                      { href: '/employees', label: 'Employees' },
+                      { href: '/contracts', label: 'Contracts' },
+                      { href: '/working-schedules', label: 'Working Schedules' },
+                    ]}
+                  />
+                  <Link
+                    href="/attendance"
+                    className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
+                  >
+                    Attendance
+                  </Link>
+                </>
+              )}
+              <NavDropdown
+                label="Time Off"
+                items={[
+                  ...(hasHrAccess ? [{ href: '/time-off-types', label: 'Time Off Types' }] : []),
+                  { href: '/time-off-allocations', label: 'Allocations' },
+                  { href: '/time-off-requests', label: 'Time Offs' },
+                ]}
+              />
+              {hasPayrollConfigAccess && (
+                <NavDropdown
+                  label="Payroll"
+                  items={[
+                    { href: '/dashboard', label: 'Dashboard' },
+                    { href: '/pay-runs', label: 'Pay Runs' },
+                    { href: '/payslips', label: 'Payslips' },
+                    { href: '/salary-structures', label: 'Salary Structures' },
+                    { href: '/salary-rules', label: 'Salary Rules' },
+                  ]}
+                />
+              )}
             </nav>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          {!isLoading && user && <AttendanceWidget />}
           {!isLoading && user && (
             <>
               {user.role === 'admin' && (

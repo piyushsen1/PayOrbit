@@ -13,6 +13,7 @@ import { Contract } from './entities/Contract';
 import { Attendance, AttendanceStatus } from './entities/Attendance';
 import { TimeOffAllocation, TimeOffAllocationStatus } from './entities/TimeOffAllocation';
 import { TimeOffRequest, TimeOffRequestStatus } from './entities/TimeOffRequest';
+import * as payRunService from './services/pay-run.service';
 
 const SALT_ROUNDS = 10;
 const USERS_TO_SEED = 10;
@@ -225,6 +226,18 @@ async function seed() {
     })
   );
   console.log('Seeded 1 approved time off request.');
+
+  const januaryPayRun = await payRunService.createPayRun({
+    name: 'January 2026',
+    salaryStructureId: standardStructure.id,
+    periodStart: '2026-01-01',
+    periodEnd: '2026-01-31',
+    employeeIds: [employeesByName['Maya Shah'].id, employeesByName['Nisha Rao'].id],
+  });
+  await payRunService.computePayRun(januaryPayRun.id);
+  await payRunService.validatePayRun(januaryPayRun.id);
+  await payRunService.markPayRunPaid(januaryPayRun.id);
+  console.log('Seeded 1 paid pay run (January 2026) with 2 payslips.');
 
   const users = Array.from({ length: USERS_TO_SEED }, () =>
     userRepository.create({

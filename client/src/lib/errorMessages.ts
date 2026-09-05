@@ -15,6 +15,7 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCodes.NOT_FOUND]: "We couldn't find what you were looking for.",
   [ErrorCodes.DUPLICATE_RESOURCE]: 'That already exists.',
   [ErrorCodes.INTERNAL_ERROR]: 'Something went wrong on our end. Please try again.',
+  [ErrorCodes.EMAIL_NOT_CONFIGURED]: 'Email sending is not set up yet — ask an admin to configure SMTP.',
 };
 
 const FALLBACK_MESSAGE = 'Something went wrong. Please try again.';

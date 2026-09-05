@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Container } from '@/components/layout/Container';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+
+/** Where each role lands after sign-in — its most central screen. */
+const LANDING_ROUTE_BY_ROLE: Record<string, string> = {
+  admin: '/users',
+  hr_payroll_manager: '/dashboard',
+  hr_payroll_user: '/dashboard',
+  hr_manager: '/employees',
+  employee: '/time-off-requests',
+};
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
@@ -15,25 +23,14 @@ export default function HomePage() {
     if (isLoading) return;
     if (!user) {
       router.replace('/login');
-    } else if (user.role === 'admin') {
-      router.replace('/users');
+      return;
     }
+    router.replace(LANDING_ROUTE_BY_ROLE[user.role] ?? '/time-off-requests');
   }, [isLoading, user, router]);
-
-  if (isLoading || !user || user.role === 'admin') {
-    return (
-      <Container className="py-10">
-        <Skeleton className="h-8 w-48" />
-      </Container>
-    );
-  }
 
   return (
     <Container className="py-10">
-      <EmptyState
-        title="You're signed in"
-        description="Nothing to show here yet for your role — HR and payroll modules are still being built."
-      />
+      <Skeleton className="h-8 w-48" />
     </Container>
   );
 }

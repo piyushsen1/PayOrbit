@@ -62,6 +62,18 @@ export function Header() {
                   </Link>
                 </>
               )}
+              {!hasHrAccess && (
+                <>
+                  <Link href="/attendance" className={navLinkClass}>
+                    Attendance
+                  </Link>
+                  {user.employeeId && (
+                    <Link href={`/employees/${user.employeeId}`} className={navLinkClass}>
+                      My Profile
+                    </Link>
+                  )}
+                </>
+              )}
               <NavDropdown
                 label="Time Off"
                 items={[

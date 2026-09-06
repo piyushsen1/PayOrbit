@@ -9,6 +9,7 @@ export interface AuthUser {
   id: string;
   role: AuthRole;
   email?: string;
+  employeeId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -25,12 +26,12 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 interface LoginResponse {
   data: {
     token: string;
-    user: { id: string; email: string; role: AuthRole; createdAt: string; updatedAt: string };
+    user: { id: string; email: string; role: AuthRole; employeeId: string | null; createdAt: string; updatedAt: string };
   };
 }
 
 interface MeResponse {
-  data: { id: string; email: string; role: AuthRole; createdAt: string; updatedAt: string };
+  data: { id: string; email: string; role: AuthRole; employeeId: string | null; createdAt: string; updatedAt: string };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

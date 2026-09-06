@@ -264,7 +264,9 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   const [attendanceCount, setAttendanceCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const canAccess = !!user && EMPLOYEE_MODULE_ROLES.includes(user.role);
+  const isHr = !!user && EMPLOYEE_MODULE_ROLES.includes(user.role);
+  const isSelf = mode === "edit" && !!user && !!user.employeeId && user.employeeId === employeeId;
+  const canAccess = isHr || isSelf;
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -287,36 +289,45 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
         }
       }
 
-      const [employeesRes, schedulesRes] = await Promise.all([
-        api.get<{ data: Employee[] }>("/employees", { params: { limit: 100, status: "active" } }),
-        api
-          .get<{ data: WorkingSchedule[] }>("/working-schedules", { params: { limit: 100, status: "active" } })
-          .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
-      ]);
+      // The manager/schedule pickers and the Contracts/Time Off/Attendance
+      // quick-count links are all HR-only data — an Employee viewing their
+      // own record (isSelf) isn't authorized to list other employees,
+      // working schedules, or anyone's contracts, so skip these entirely
+      // for a self-view instead of letting them 403 the whole page load.
+      let employees: Employee[] = [];
+      let schedules: WorkingSchedule[] = [];
 
-      let employees = employeesRes.data.data;
-      let schedules = schedulesRes.data.data;
+      if (isHr) {
+        const [employeesRes, schedulesRes] = await Promise.all([
+          api.get<{ data: Employee[] }>("/employees", { params: { limit: 100, status: "active" } }),
+          api
+            .get<{ data: WorkingSchedule[] }>("/working-schedules", { params: { limit: 100, status: "active" } })
+            .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
+        ]);
+        employees = employeesRes.data.data;
+        schedules = schedulesRes.data.data;
 
-      // Preserve the employee's currently-assigned manager/schedule even if
-      // they've since gone inactive, so editing doesn't look like the
-      // assignment was silently wiped (or risk clearing it on save).
-      const managerId = employeeData?.managerId;
-      if (managerId && !employees.some((e) => e.id === managerId)) {
-        try {
-          const { data } = await api.get<{ data: Employee }>(`/employees/${managerId}`);
-          employees = [...employees, data.data];
-        } catch {
-          // manager record unavailable — leave options as-is
+        // Preserve the employee's currently-assigned manager/schedule even if
+        // they've since gone inactive, so editing doesn't look like the
+        // assignment was silently wiped (or risk clearing it on save).
+        const managerId = employeeData?.managerId;
+        if (managerId && !employees.some((e) => e.id === managerId)) {
+          try {
+            const { data } = await api.get<{ data: Employee }>(`/employees/${managerId}`);
+            employees = [...employees, data.data];
+          } catch {
+            // manager record unavailable — leave options as-is
+          }
         }
-      }
 
-      const workingScheduleId = employeeData?.workingScheduleId;
-      if (workingScheduleId && !schedules.some((s) => s.id === workingScheduleId)) {
-        try {
-          const { data } = await api.get<{ data: WorkingSchedule }>(`/working-schedules/${workingScheduleId}`);
-          schedules = [...schedules, data.data];
-        } catch {
-          // schedule record unavailable — leave options as-is
+        const workingScheduleId = employeeData?.workingScheduleId;
+        if (workingScheduleId && !schedules.some((s) => s.id === workingScheduleId)) {
+          try {
+            const { data } = await api.get<{ data: WorkingSchedule }>(`/working-schedules/${workingScheduleId}`);
+            schedules = [...schedules, data.data];
+          } catch {
+            // schedule record unavailable — leave options as-is
+          }
         }
       }
 
@@ -327,20 +338,22 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
         setEmployee(employeeData);
         setForm(toFormState(employeeData));
 
-        const [contractsRes, timeOffRes, attendanceRes] = await Promise.all([
-          api
-            .get<{ data: unknown[] }>("/contracts", { params: { employeeId } })
-            .catch(() => ({ data: { data: [] as unknown[] } })),
-          api
-            .get<{ data: unknown[] }>("/time-off-requests", { params: { employeeId } })
-            .catch(() => ({ data: { data: [] as unknown[] } })),
-          api
-            .get<{ data: unknown[] }>("/attendance", { params: { employeeId } })
-            .catch(() => ({ data: { data: [] as unknown[] } })),
-        ]);
-        setContractsCount(contractsRes.data.data.length);
-        setTimeOffCount(timeOffRes.data.data.length);
-        setAttendanceCount(attendanceRes.data.data.length);
+        if (isHr) {
+          const [contractsRes, timeOffRes, attendanceRes] = await Promise.all([
+            api
+              .get<{ data: unknown[] }>("/contracts", { params: { employeeId } })
+              .catch(() => ({ data: { data: [] as unknown[] } })),
+            api
+              .get<{ data: unknown[] }>("/time-off-requests", { params: { employeeId } })
+              .catch(() => ({ data: { data: [] as unknown[] } })),
+            api
+              .get<{ data: unknown[] }>("/attendance", { params: { employeeId } })
+              .catch(() => ({ data: { data: [] as unknown[] } })),
+          ]);
+          setContractsCount(contractsRes.data.data.length);
+          setTimeOffCount(timeOffRes.data.data.length);
+          setAttendanceCount(attendanceRes.data.data.length);
+        }
       }
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -355,7 +368,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [mode, employeeId, showToast]);
+  }, [mode, employeeId, isHr, showToast]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -492,7 +505,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
       <Container className="py-10">
         <EmptyState
           title="Not authorized"
-          description="Employees is only available to HR and payroll roles."
+          description="Employees is only available to HR and payroll roles, or to view your own record."
         />
       </Container>
     );
@@ -543,7 +556,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
           </p>
         </div>
 
-        {mode === "edit" && (
+        {mode === "edit" && isHr && (
           <div className="flex items-center gap-3">
             <div className="flex gap-2">
               <Button

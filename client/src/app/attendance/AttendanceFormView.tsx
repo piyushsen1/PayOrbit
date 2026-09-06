@@ -88,15 +88,28 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const canAccess = !!user && ATTENDANCE_MODULE_ROLES.includes(user.role);
+  const isHr = !!user && ATTENDANCE_MODULE_ROLES.includes(user.role);
+  // Manual entry (mode 'create') is HR-only — self-service creation goes
+  // through the header check-in/out widget instead. Viewing (mode 'edit')
+  // is attempted for any signed-in user; the server's canAccessOwnRecord
+  // guard on GET /attendance/:id is what actually decides whether this is
+  // the caller's own record, so a non-owner just gets a 403 below.
+  const canAccess = isHr || mode === 'edit';
+  const [notAuthorized, setNotAuthorized] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const employeesRes = await api.get<{ data: Employee[] }>('/employees', {
-        params: { limit: 100, status: 'active' },
-      });
-      let employees = employeesRes.data.data;
+      // The employee picker is HR-only data — a non-HR viewer isn't
+      // authorized to list every employee, and doesn't need to (they can
+      // only ever be looking at their own record).
+      let employees: Employee[] = [];
+      if (isHr) {
+        const employeesRes = await api.get<{ data: Employee[] }>('/employees', {
+          params: { limit: 100, status: 'active' },
+        });
+        employees = employeesRes.data.data;
+      }
 
       if (mode === 'edit' && attendanceId) {
         try {
@@ -113,7 +126,9 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
 
           // Keep the assigned employee in the picker even if they've since
           // gone inactive, so editing doesn't look like the assignment was
-          // silently wiped (or risk clearing it on save).
+          // silently wiped (or risk clearing it on save). For a non-HR
+          // viewer this is just their own record, permitted since GET
+          // /employees/:id allows an Employee to read their own profile.
           if (a.employeeId && !employees.some((e) => e.id === a.employeeId)) {
             try {
               const { data: empData } = await api.get<{ data: Employee }>(`/employees/${a.employeeId}`);
@@ -126,6 +141,8 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
           const axiosErr = err as AxiosError<ApiErrorBody>;
           if (axiosErr.response?.status === 404) {
             setNotFound(true);
+          } else if (axiosErr.response?.status === 403) {
+            setNotAuthorized(true);
           } else {
             throw err;
           }
@@ -143,7 +160,7 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
     } finally {
       setIsLoading(false);
     }
-  }, [mode, attendanceId, showToast]);
+  }, [mode, attendanceId, isHr, showToast]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -236,6 +253,14 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
     );
   }
 
+  if (mode === 'edit' && notAuthorized) {
+    return (
+      <Container className="py-10">
+        <EmptyState title="Not authorized" description="You can only view your own attendance records." />
+      </Container>
+    );
+  }
+
   const selectedEmployee = employees.find((e) => e.id === employeeId);
   const managerName = employees.find((e) => e.id === selectedEmployee?.managerId)?.fullName ?? '—';
   const employeeOptions = employees.map((e) => ({
@@ -264,15 +289,34 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
               disabled={mode === 'edit'}
               onChange={(e) => setEmployeeId(e.target.value)}
             />
-            <Input label="Date *" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            <Input label="Check In" type="datetime-local" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
-            <Input label="Check Out" type="datetime-local" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+            <Input
+              label="Date *"
+              type="date"
+              value={date}
+              disabled={!isHr}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <Input
+              label="Check In"
+              type="datetime-local"
+              value={checkIn}
+              disabled={!isHr}
+              onChange={(e) => setCheckIn(e.target.value)}
+            />
+            <Input
+              label="Check Out"
+              type="datetime-local"
+              value={checkOut}
+              disabled={!isHr}
+              onChange={(e) => setCheckOut(e.target.value)}
+            />
             <Input label="Department" value={selectedEmployee?.department ?? '—'} disabled />
             <Input label="Manager" value={managerName} disabled />
             <Select
               label="Status"
               options={STATUS_OPTIONS}
               value={status}
+              disabled={!isHr}
               onChange={(e) => setStatus(e.target.value as 'present' | 'late' | 'absent')}
             />
             {mode === 'edit' && (
@@ -293,7 +337,7 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
             )}
           </div>
 
-          <Textarea label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Textarea label="Notes" value={notes} disabled={!isHr} onChange={(e) => setNotes(e.target.value)} />
 
           {formError && (
             <p className="rounded-2xl bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]">
@@ -302,7 +346,7 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
           )}
 
           <div className="flex justify-between gap-2">
-            {mode === 'edit' ? (
+            {mode === 'edit' && isHr ? (
               <Button variant="danger" onClick={handleDelete} isLoading={isDeleting}>
                 Delete
               </Button>
@@ -311,11 +355,13 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
             )}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => router.push('/attendance')}>
-                Cancel
+                {isHr ? 'Cancel' : 'Back'}
               </Button>
-              <Button onClick={handleSave} isLoading={isSubmitting}>
-                {mode === 'create' ? 'Create Record' : 'Save'}
-              </Button>
+              {isHr && (
+                <Button onClick={handleSave} isLoading={isSubmitting}>
+                  {mode === 'create' ? 'Create Record' : 'Save'}
+                </Button>
+              )}
             </div>
           </div>
         </CardBody>

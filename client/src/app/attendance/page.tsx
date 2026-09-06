@@ -98,7 +98,8 @@ function AttendancePageContent() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
 
-  const canAccess = !!user && ATTENDANCE_MODULE_ROLES.includes(user.role);
+  const canAccess = !!user;
+  const isHr = !!user && ATTENDANCE_MODULE_ROLES.includes(user.role);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -117,9 +118,13 @@ function AttendancePageContent() {
       if (statusFilter) params.status = statusFilter;
       if (search) params.search = search;
 
+      // The employee filter dropdown is HR-only data — an Employee viewing
+      // their own attendance isn't authorized to list every employee.
       const [attendanceRes, employeesRes] = await Promise.all([
         api.get<{ data: Attendance[]; meta: PaginationMeta }>('/attendance', { params }),
-        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+        isHr
+          ? api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } })
+          : Promise.resolve({ data: { data: [] as Employee[] } }),
       ]);
       setRecords(attendanceRes.data.data);
       setMeta(attendanceRes.data.meta);
@@ -134,7 +139,7 @@ function AttendancePageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeFilter, todayOnly, statusFilter, search, showToast, page]);
+  }, [employeeFilter, todayOnly, statusFilter, search, showToast, page, isHr]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -160,23 +165,27 @@ function AttendancePageContent() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => router.push('/attendance/new')}>+ New</Button>
-        <Input
-          placeholder="Search by employee name…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="w-64"
-        />
-        <Select
-          placeholder="All employees"
-          options={employees.map((e) => ({ value: e.id, label: e.fullName }))}
-          value={employeeFilter}
-          onChange={(e) => {
-            setEmployeeFilter(e.target.value);
-            setPage(1);
-          }}
-          className="w-56"
-        />
+        {isHr && <Button onClick={() => router.push('/attendance/new')}>+ New</Button>}
+        {isHr && (
+          <Input
+            placeholder="Search by employee name…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-64"
+          />
+        )}
+        {isHr && (
+          <Select
+            placeholder="All employees"
+            options={employees.map((e) => ({ value: e.id, label: e.fullName }))}
+            value={employeeFilter}
+            onChange={(e) => {
+              setEmployeeFilter(e.target.value);
+              setPage(1);
+            }}
+            className="w-56"
+          />
+        )}
         <Select
           placeholder="All statuses"
           options={STATUS_OPTIONS}
@@ -195,12 +204,15 @@ function AttendancePageContent() {
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
       ) : records.length === 0 ? (
-        <EmptyState title="No attendance records found" description="Create a manual entry to get started." />
+        <EmptyState
+          title="No attendance records found"
+          description={isHr ? 'Create a manual entry to get started.' : 'Check in from the header to get started.'}
+        />
       ) : (
         <Table>
           <TableHead>
             <TableRow>
-              <TableHeaderCell>Employee</TableHeaderCell>
+              {isHr && <TableHeaderCell>Employee</TableHeaderCell>}
               <TableHeaderCell>Date</TableHeaderCell>
               <TableHeaderCell>Check In</TableHeaderCell>
               <TableHeaderCell>Check Out</TableHeaderCell>
@@ -211,7 +223,7 @@ function AttendancePageContent() {
           <TableBody>
             {records.map((r) => (
               <TableRow key={r.id} className="cursor-pointer" onClick={() => router.push(`/attendance/${r.id}`)}>
-                <TableCell className="font-medium">{employeeNameById.get(r.employeeId) ?? '—'}</TableCell>
+                {isHr && <TableCell className="font-medium">{employeeNameById.get(r.employeeId) ?? '—'}</TableCell>}
                 <TableCell>{r.date}</TableCell>
                 <TableCell>{formatTime(r.checkIn)}</TableCell>
                 <TableCell>{formatTime(r.checkOut)}</TableCell>

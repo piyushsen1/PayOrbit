@@ -1,9 +1,11 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
-import { UserRole } from '../entities/User';
+import { canAccessOwnRecord } from '../middleware/canAccessOwnRecord';
+import { AppDataSource } from '../config/data-source';
+import { User, UserRole } from '../entities/User';
 import { EmployeeStatus, EmployeeType } from '../entities/Employee';
 import { paginationQuerySchema } from '../utils/pagination';
 import {
@@ -22,6 +24,12 @@ const MANAGE_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR
 
 /** Only feeds the Payroll Dashboard's filter dropdowns — gated the same as the Dashboard itself. */
 const DASHBOARD_READ_ROLES = [UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
+
+/** Resolves the User id linked to a given employee id, for canAccessOwnRecord — lets an Employee read their own profile. */
+async function resolveEmployeeOwnerUserId(req: Request): Promise<string | null> {
+  const owner = await AppDataSource.getRepository(User).findOne({ where: { employeeId: req.params.id } });
+  return owner?.id ?? null;
+}
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
@@ -162,7 +170,7 @@ router.get('/filter-options', authGuard, roleGuard(...DASHBOARD_READ_ROLES), get
  * @openapi
  * /api/employees/{id}:
  *   get:
- *     summary: Get one employee
+ *     summary: Get one employee. HR Manager+ can view any employee; an Employee can only view their own linked record.
  *     tags: [Employees]
  *     security:
  *       - bearerAuth: []
@@ -179,7 +187,13 @@ router.get('/filter-options', authGuard, roleGuard(...DASHBOARD_READ_ROLES), get
  *       404:
  *         description: Not found.
  */
-router.get('/:id', authGuard, roleGuard(...MANAGE_ROLES), validate(idParamOnlySchema), getEmployeeHandler);
+router.get(
+  '/:id',
+  authGuard,
+  validate(idParamOnlySchema),
+  canAccessOwnRecord(resolveEmployeeOwnerUserId, MANAGE_ROLES),
+  getEmployeeHandler
+);
 
 /**
  * @openapi

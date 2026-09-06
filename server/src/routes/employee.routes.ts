@@ -12,6 +12,7 @@ import {
   createEmployeeHandler,
   updateEmployeeHandler,
   deleteEmployeeHandler,
+  getEmployeeFilterOptionsHandler,
 } from '../controllers/employee.controller';
 
 const router = Router();
@@ -19,13 +20,49 @@ const router = Router();
 /** Per root CLAUDE.md roles table: HR Manager and every payroll/admin role above it have full CRUD on Employees. */
 const MANAGE_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
 
+/** Only feeds the Payroll Dashboard's filter dropdowns — gated the same as the Dashboard itself. */
+const DASHBOARD_READ_ROLES = [UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
+
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
-const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
+const listQuerySchema = z.object({
+  query: z.object({
+    search: z.string().trim().min(1).optional(),
+    status: z.nativeEnum(EmployeeStatus).optional(),
+    ...paginationQuerySchema,
+  }),
+});
+
+const phoneSchema = z
+  .string()
+  .regex(/^\+?[0-9()\-\s]{7,20}$/, 'Enter a valid phone number.')
+  .nullable()
+  .optional();
+
+const bankAccountSchema = z
+  .string()
+  .regex(/^[0-9]{6,20}$/, 'Bank account number must be 6-20 digits.')
+  .nullable()
+  .optional();
+
+const dateOfBirthSchema = z
+  .string()
+  .date()
+  .refine((dob) => new Date(dob) <= new Date(), 'Date of birth cannot be in the future.')
+  .refine((dob) => {
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
+    return age >= 15;
+  }, 'Employee must be at least 15 years old.')
+  .nullable()
+  .optional();
 
 const employeeBodyBase = {
-  fullName: z.string().min(1, 'Full name is required.'),
-  workEmail: z.string().email('Enter a valid work email.'),
+  fullName: z.string().trim().min(1, 'Full name is required.').max(100, 'Full name must be under 100 characters.'),
+  workEmail: z.string().trim().email('Enter a valid work email.'),
   jobPosition: z.string().min(1).nullable().optional(),
   department: z.string().min(1).nullable().optional(),
   status: z.nativeEnum(EmployeeStatus).optional(),
@@ -34,13 +71,13 @@ const employeeBodyBase = {
   workingScheduleId: z.string().uuid().nullable().optional(),
   workLocation: z.string().min(1).nullable().optional(),
   company: z.string().min(1).nullable().optional(),
-  phone: z.string().min(1).nullable().optional(),
-  personalEmail: z.string().email().nullable().optional(),
+  phone: phoneSchema,
+  personalEmail: z.string().trim().email('Enter a valid personal email.').nullable().optional(),
   homeAddress: z.string().min(1).nullable().optional(),
-  dateOfBirth: z.string().date().nullable().optional(),
+  dateOfBirth: dateOfBirthSchema,
   emergencyContactName: z.string().min(1).nullable().optional(),
-  emergencyContactPhone: z.string().min(1).nullable().optional(),
-  bankAccountNumber: z.string().min(1).nullable().optional(),
+  emergencyContactPhone: phoneSchema,
+  bankAccountNumber: bankAccountSchema,
 };
 
 const createEmployeeSchema = z.object({
@@ -67,6 +104,13 @@ const updateEmployeeSchema = z.object({
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 10 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive partial match on full name.
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [active, inactive] }
  *     responses:
  *       200:
  *         description: Page of employees, with a `meta` pagination block.
@@ -74,6 +118,23 @@ const updateEmployeeSchema = z.object({
  *         description: Caller lacks HR/payroll access.
  */
 router.get('/', authGuard, roleGuard(...MANAGE_ROLES), validate(listQuerySchema), listEmployeesHandler);
+
+/**
+ * @openapi
+ * /api/employees/filter-options:
+ *   get:
+ *     summary: Distinct department/company values across all employees (feeds the Payroll Dashboard's filter dropdowns)
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ departments: string[], companies: string[] } — both alphabetically sorted, non-null values only."
+ *       403:
+ *         description: Caller lacks payroll access.
+ */
+// Registered before /:id so the literal path isn't swallowed by the uuid param route.
+router.get('/filter-options', authGuard, roleGuard(...DASHBOARD_READ_ROLES), getEmployeeFilterOptionsHandler);
 
 /**
  * @openapi

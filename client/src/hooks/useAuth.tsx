@@ -30,7 +30,7 @@ interface LoginResponse {
 }
 
 interface MeResponse {
-  data: { sub: string; role: AuthRole };
+  data: { id: string; email: string; role: AuthRole; createdAt: string; updatedAt: string };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     api
       .get<MeResponse>('/auth/me')
-      .then(({ data }) => setUser({ id: data.data.sub, role: data.data.role }))
+      .then(({ data }) => setUser(data.data))
       .catch(() => setStoredToken(null))
       .finally(() => setIsLoading(false));
   }, []);

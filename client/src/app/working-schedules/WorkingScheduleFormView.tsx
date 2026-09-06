@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -164,6 +165,21 @@ export function WorkingScheduleFormView({ mode, scheduleId }: WorkingScheduleFor
       setFormError('Add at least one day.');
       return;
     }
+    const seenDays = new Set<string>();
+    let duplicateDay: DayRow | undefined;
+    for (const d of days) {
+      if (seenDays.has(d.dayOfWeek)) {
+        duplicateDay = d;
+        break;
+      }
+      seenDays.add(d.dayOfWeek);
+    }
+    if (duplicateDay) {
+      setFormError(
+        `${DAY_OPTIONS.find((o) => o.value === duplicateDay.dayOfWeek)?.label ?? duplicateDay.dayOfWeek} is added more than once — each day can only appear once in a schedule.`
+      );
+      return;
+    }
 
     const payload = {
       name,
@@ -244,7 +260,8 @@ export function WorkingScheduleFormView({ mode, scheduleId }: WorkingScheduleFor
 
   return (
     <Container className="flex flex-col gap-6 py-10">
-      <div>
+      <div className="flex flex-col gap-2">
+        <BackButton href="/working-schedules" label="Back to Working Schedules" />
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
           {mode === 'create' ? 'New Working Schedule' : `Working Schedule / ${name}`}
         </h1>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
@@ -58,14 +58,27 @@ export default function TimeOffTypesPage() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const canAccess = !!user && TIME_OFF_TYPE_MODULE_ROLES.includes(user.role);
+
+  // Debounce the free-text search before it drives a refetch.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Search is types server-side, so its result set (and page count) can change —
+  // land back on page 1 rather than risk showing an out-of-range empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data } = await api.get<{ data: TimeOffType[]; meta: PaginationMeta }>('/time-off-types', {
-        params: { page },
+        params: { page, search: debouncedSearch || undefined },
       });
       setTypes(data.data);
       setMeta(data.meta);
@@ -79,17 +92,11 @@ export default function TimeOffTypesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, page]);
+  }, [showToast, page, debouncedSearch]);
 
   useEffect(() => {
     if (canAccess) loadData();
   }, [canAccess, loadData]);
-
-  const filtered = useMemo(() => {
-    if (!search) return types;
-    const needle = search.toLowerCase();
-    return types.filter((t) => t.name.toLowerCase().includes(needle));
-  }, [types, search]);
 
   if (authLoading) return null;
 
@@ -124,7 +131,7 @@ export default function TimeOffTypesPage() {
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : filtered.length === 0 ? (
+      ) : types.length === 0 ? (
         <EmptyState title="No time off types yet" description="Create the first leave policy to get started." />
       ) : (
         <Table>
@@ -138,7 +145,7 @@ export default function TimeOffTypesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.map((t) => (
+            {types.map((t) => (
               <TableRow key={t.id} className="cursor-pointer" onClick={() => router.push(`/time-off-types/${t.id}`)}>
                 <TableCell className="font-medium">{t.name}</TableCell>
                 <TableCell>{t.unit === 'days' ? 'Days' : 'Hours'}</TableCell>

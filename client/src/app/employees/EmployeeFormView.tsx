@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AxiosError } from "axios";
+import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errorMessages";
 import { Container } from "@/components/layout/Container";
 import { Card, CardBody } from "@/components/ui/Card";
+import { BackButton } from "@/components/ui/BackButton";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -52,6 +54,7 @@ interface WorkingSchedule {
   id: string;
   name: string;
   weeklyHours: string;
+  status?: Status;
 }
 
 interface ApiErrorBody {
@@ -136,6 +139,64 @@ function toFormState(employee: Employee): FormState {
   };
 }
 
+const PHONE_REGEX = /^\+?[0-9()\-\s]{7,20}$/;
+const BANK_ACCOUNT_REGEX = /^[0-9]{6,20}$/;
+
+const PRIVATE_TAB_FIELDS = new Set<keyof FormState>([
+  "personalEmail",
+  "phone",
+  "homeAddress",
+  "dateOfBirth",
+  "emergencyContactName",
+  "emergencyContactPhone",
+  "bankAccountNumber",
+]);
+
+function calculateAge(dob: string): number {
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+/** All fields are strings in FormState; an empty string means "not provided" and is always valid for optional fields — only non-empty values are format-checked. */
+const employeeSchema = z
+  .object({
+    fullName: z.string().trim().min(1, "Full name is required.").max(100, "Full name must be under 100 characters."),
+    workEmail: z.string().trim().email("Enter a valid work email address."),
+    personalEmail: z.string(),
+    phone: z.string(),
+    emergencyContactPhone: z.string(),
+    dateOfBirth: z.string(),
+    bankAccountNumber: z.string(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.personalEmail && !z.string().email().safeParse(data.personalEmail).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["personalEmail"], message: "Enter a valid personal email address." });
+    }
+    if (data.phone && !PHONE_REGEX.test(data.phone)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Enter a valid phone number." });
+    }
+    if (data.emergencyContactPhone && !PHONE_REGEX.test(data.emergencyContactPhone)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["emergencyContactPhone"], message: "Enter a valid phone number." });
+    }
+    if (data.bankAccountNumber && !BANK_ACCOUNT_REGEX.test(data.bankAccountNumber)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankAccountNumber"], message: "Bank account number must be 6-20 digits." });
+    }
+    if (data.dateOfBirth) {
+      const parsed = new Date(data.dateOfBirth);
+      if (Number.isNaN(parsed.getTime())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Enter a valid date of birth." });
+      } else if (parsed.getTime() > Date.now()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Date of birth cannot be in the future." });
+      } else if (calculateAge(data.dateOfBirth) < 15) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Employee must be at least 15 years old." });
+      }
+    }
+  });
+
 function buildPayload(form: FormState) {
   return {
     fullName: form.fullName,
@@ -178,55 +239,90 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   const [isEditing, setIsEditing] = useState(mode === "create");
   const [tab, setTab] = useState("work");
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contractsCount, setContractsCount] = useState(0);
   const [timeOffCount, setTimeOffCount] = useState(0);
   const [attendanceCount, setAttendanceCount] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const canAccess = !!user && EMPLOYEE_MODULE_ROLES.includes(user.role);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [employeesRes, schedulesRes] = await Promise.all([
-        api.get<{ data: Employee[] }>("/employees", { params: { limit: 100 } }),
-        api
-          .get<{ data: WorkingSchedule[] }>("/working-schedules", { params: { limit: 100 } })
-          .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
-      ]);
-      setAllEmployees(employeesRes.data.data);
-      setWorkingSchedules(schedulesRes.data.data);
+      let employeeData: Employee | null = null;
 
       if (mode === "edit" && employeeId) {
         try {
           const { data } = await api.get<{ data: Employee }>(
             `/employees/${employeeId}`,
           );
-          setEmployee(data.data);
-          setForm(toFormState(data.data));
-
-          const [contractsRes, timeOffRes, attendanceRes] = await Promise.all([
-            api
-              .get<{ data: unknown[] }>("/contracts", { params: { employeeId } })
-              .catch(() => ({ data: { data: [] as unknown[] } })),
-            api
-              .get<{ data: unknown[] }>("/time-off-requests", { params: { employeeId } })
-              .catch(() => ({ data: { data: [] as unknown[] } })),
-            api
-              .get<{ data: unknown[] }>("/attendance", { params: { employeeId } })
-              .catch(() => ({ data: { data: [] as unknown[] } })),
-          ]);
-          setContractsCount(contractsRes.data.data.length);
-          setTimeOffCount(timeOffRes.data.data.length);
-          setAttendanceCount(attendanceRes.data.data.length);
+          employeeData = data.data;
         } catch (err) {
           const axiosErr = err as AxiosError<ApiErrorBody>;
           if (axiosErr.response?.status === 404) {
             setNotFound(true);
-          } else {
-            throw err;
+            return;
           }
+          throw err;
         }
+      }
+
+      const [employeesRes, schedulesRes] = await Promise.all([
+        api.get<{ data: Employee[] }>("/employees", { params: { limit: 100, status: "active" } }),
+        api
+          .get<{ data: WorkingSchedule[] }>("/working-schedules", { params: { limit: 100, status: "active" } })
+          .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
+      ]);
+
+      let employees = employeesRes.data.data;
+      let schedules = schedulesRes.data.data;
+
+      // Preserve the employee's currently-assigned manager/schedule even if
+      // they've since gone inactive, so editing doesn't look like the
+      // assignment was silently wiped (or risk clearing it on save).
+      const managerId = employeeData?.managerId;
+      if (managerId && !employees.some((e) => e.id === managerId)) {
+        try {
+          const { data } = await api.get<{ data: Employee }>(`/employees/${managerId}`);
+          employees = [...employees, data.data];
+        } catch {
+          // manager record unavailable — leave options as-is
+        }
+      }
+
+      const workingScheduleId = employeeData?.workingScheduleId;
+      if (workingScheduleId && !schedules.some((s) => s.id === workingScheduleId)) {
+        try {
+          const { data } = await api.get<{ data: WorkingSchedule }>(`/working-schedules/${workingScheduleId}`);
+          schedules = [...schedules, data.data];
+        } catch {
+          // schedule record unavailable — leave options as-is
+        }
+      }
+
+      setAllEmployees(employees);
+      setWorkingSchedules(schedules);
+
+      if (employeeData) {
+        setEmployee(employeeData);
+        setForm(toFormState(employeeData));
+
+        const [contractsRes, timeOffRes, attendanceRes] = await Promise.all([
+          api
+            .get<{ data: unknown[] }>("/contracts", { params: { employeeId } })
+            .catch(() => ({ data: { data: [] as unknown[] } })),
+          api
+            .get<{ data: unknown[] }>("/time-off-requests", { params: { employeeId } })
+            .catch(() => ({ data: { data: [] as unknown[] } })),
+          api
+            .get<{ data: unknown[] }>("/attendance", { params: { employeeId } })
+            .catch(() => ({ data: { data: [] as unknown[] } })),
+        ]);
+        setContractsCount(contractsRes.data.data.length);
+        setTimeOffCount(timeOffRes.data.data.length);
+        setAttendanceCount(attendanceRes.data.data.length);
       }
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -249,19 +345,42 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function validateForm(): boolean {
+    const parsed = employeeSchema.safeParse(form);
+    if (parsed.success) {
+      setFieldErrors({});
+      return true;
+    }
+    const errors: Partial<Record<keyof FormState, string>> = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0] as keyof FormState;
+      if (!errors[key]) errors[key] = issue.message;
+    }
+    setFieldErrors(errors);
+    const firstErrorField = parsed.error.issues[0]?.path[0] as keyof FormState | undefined;
+    if (firstErrorField && PRIVATE_TAB_FIELDS.has(firstErrorField)) {
+      setTab("private");
+    }
+    return false;
   }
 
   function handleCancel() {
     if (employee) setForm(toFormState(employee));
+    setFieldErrors({});
     setIsEditing(false);
   }
 
   async function handleCreate() {
-    if (!form.fullName.trim() || !form.workEmail.trim()) {
-      showToast({
-        title: "Full name and work email are required.",
-        variant: "danger",
-      });
+    if (!validateForm()) {
+      showToast({ title: "Please fix the highlighted fields.", variant: "danger" });
       return;
     }
     setIsSubmitting(true);
@@ -287,8 +406,35 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
     }
   }
 
+  async function handleDelete() {
+    if (!employee) return;
+    if (!window.confirm("Delete this employee? This cannot be undone.")) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/employees/${employee.id}`);
+      showToast({ title: "Employee deleted", variant: "success" });
+      router.push("/employees");
+    } catch (err) {
+      const axiosErr = err as AxiosError<ApiErrorBody>;
+      showToast({
+        title: "Failed to delete employee",
+        description: getErrorMessage(
+          axiosErr.response?.data?.error?.code,
+          axiosErr.response?.data?.error?.message,
+        ),
+        variant: "danger",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   async function handleSaveEdit() {
     if (!employee) return;
+    if (!validateForm()) {
+      showToast({ title: "Please fix the highlighted fields.", variant: "danger" });
+      return;
+    }
     setIsSubmitting(true);
     try {
       const { data } = await api.patch<{ data: Employee }>(
@@ -347,11 +493,17 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
 
   const managerOptions = allEmployees
     .filter((e) => e.id !== employeeId)
-    .map((e) => ({ value: e.id, label: e.fullName }));
+    .map((e) => ({
+      value: e.id,
+      label: e.status === "inactive" ? `${e.fullName} (Inactive)` : e.fullName,
+    }));
 
   const scheduleOptions = workingSchedules.map((s) => ({
     value: s.id,
-    label: `${s.name} (${s.weeklyHours}h/week)`,
+    label:
+      s.status === "inactive"
+        ? `${s.name} (${s.weeklyHours}h/week) (Inactive)`
+        : `${s.name} (${s.weeklyHours}h/week)`,
   }));
 
   const readOnly = mode === "edit" && !isEditing;
@@ -359,7 +511,8 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
   return (
     <Container className="flex flex-col gap-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="flex flex-col gap-2">
+          <BackButton href="/employees" label="Back to Employees" />
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
             {mode === "create"
               ? "New Employee"
@@ -403,6 +556,14 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                 Attendance {attendanceCount}
               </Button>
             </div>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDelete}
+              isLoading={isDeleting}
+            >
+              Delete
+            </Button>
             {!isEditing ? (
               <Button
                 variant="outline"
@@ -451,12 +612,14 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
               <Input
                 label="Full Name *"
                 value={form.fullName}
+                error={fieldErrors.fullName}
                 onChange={(e) => setField("fullName", e.target.value)}
               />
               <Input
                 label="Work Email *"
                 type="email"
                 value={form.workEmail}
+                error={fieldErrors.workEmail}
                 onChange={(e) => setField("workEmail", e.target.value)}
               />
             </div>
@@ -554,6 +717,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                     type="email"
                     value={form.workEmail}
                     disabled={readOnly}
+                    error={fieldErrors.workEmail}
                     onChange={(e) => setField("workEmail", e.target.value)}
                   />
                 )}
@@ -567,12 +731,15 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   type="email"
                   value={form.personalEmail}
                   disabled={readOnly}
+                  error={fieldErrors.personalEmail}
                   onChange={(e) => setField("personalEmail", e.target.value)}
                 />
                 <Input
                   label="Phone Number"
                   value={form.phone}
                   disabled={readOnly}
+                  error={fieldErrors.phone}
+                  hint={fieldErrors.phone ? undefined : "Digits only, optionally with +, spaces, dashes, or parentheses."}
                   onChange={(e) => setField("phone", e.target.value)}
                 />
                 <Input
@@ -586,6 +753,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   type="date"
                   value={form.dateOfBirth}
                   disabled={readOnly}
+                  error={fieldErrors.dateOfBirth}
                   onChange={(e) => setField("dateOfBirth", e.target.value)}
                 />
                 <Input
@@ -600,6 +768,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   label="Emergency Contact Phone"
                   value={form.emergencyContactPhone}
                   disabled={readOnly}
+                  error={fieldErrors.emergencyContactPhone}
                   onChange={(e) =>
                     setField("emergencyContactPhone", e.target.value)
                   }
@@ -608,7 +777,12 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   label="Bank Account Number"
                   value={form.bankAccountNumber}
                   disabled={readOnly}
-                  hint="Required for payroll — a missing value surfaces as a pay-run warning."
+                  error={fieldErrors.bankAccountNumber}
+                  hint={
+                    fieldErrors.bankAccountNumber
+                      ? undefined
+                      : "Required for payroll — a missing value surfaces as a pay-run warning. Digits only, 6-20 characters."
+                  }
                   onChange={(e) =>
                     setField("bankAccountNumber", e.target.value)
                   }

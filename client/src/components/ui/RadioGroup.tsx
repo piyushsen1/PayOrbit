@@ -16,9 +16,10 @@ export interface RadioGroupProps {
   onChange?: (value: string) => void;
   error?: string;
   className?: string;
+  disabled?: boolean;
 }
 
-export function RadioGroup({ label, name, options, value, onChange, error, className }: RadioGroupProps) {
+export function RadioGroup({ label, name, options, value, onChange, error, className, disabled }: RadioGroupProps) {
   const generatedId = useId();
 
   return (
@@ -33,7 +34,10 @@ export function RadioGroup({ label, name, options, value, onChange, error, class
             <label
               key={option.value}
               htmlFor={optionId}
-              className="flex items-center gap-2 text-sm text-[var(--text-secondary)]"
+              className={cn(
+                'flex items-center gap-2 text-sm text-[var(--text-secondary)]',
+                disabled && 'cursor-not-allowed opacity-50'
+              )}
             >
               <input
                 type="radio"
@@ -41,6 +45,7 @@ export function RadioGroup({ label, name, options, value, onChange, error, class
                 name={name}
                 value={option.value}
                 checked={value === option.value}
+                disabled={disabled}
                 onChange={() => onChange?.(option.value)}
                 className="h-4 w-4 accent-[var(--primary)]"
               />

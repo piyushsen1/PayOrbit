@@ -9,6 +9,7 @@ import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -21,6 +22,11 @@ type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager'
 const HR_ROLES: Role[] = ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'];
 
 const STATUS_VARIANT: Record<string, BadgeVariant> = { pending: 'warning', approved: 'success', refused: 'danger' };
+const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'refused', label: 'Refused' },
+];
 
 interface Employee {
   id: string;
@@ -52,14 +58,27 @@ export default function TimeOffAllocationsPage() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [employeeFilter, setEmployeeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
   const isHr = !!user && HR_ROLES.includes(user.role);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const params: Record<string, string | number> = { page };
       if (employeeFilter) params.employeeId = employeeFilter;
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
 
       const [allocationsRes, employeesRes] = await Promise.all([
         api.get<{ data: Allocation[]; meta: PaginationMeta }>('/time-off-allocations', { params }),
@@ -80,7 +99,7 @@ export default function TimeOffAllocationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeFilter, isHr, showToast, page]);
+  }, [employeeFilter, statusFilter, search, isHr, showToast, page]);
 
   useEffect(() => {
     if (user) loadData();
@@ -105,15 +124,34 @@ export default function TimeOffAllocationsPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         {isHr && <Button onClick={() => router.push('/time-off-allocations/new')}>+ New</Button>}
+        <Input
+          placeholder="Search by employee or type…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-64"
+        />
         {isHr && (
           <Select
             placeholder="All employees"
             options={employees.map((e) => ({ value: e.id, label: e.fullName }))}
             value={employeeFilter}
-            onChange={(e) => setEmployeeFilter(e.target.value)}
+            onChange={(e) => {
+              setEmployeeFilter(e.target.value);
+              setPage(1);
+            }}
             className="w-56"
           />
         )}
+        <Select
+          placeholder="All statuses"
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          className="w-44"
+        />
       </div>
 
       {isLoading ? (

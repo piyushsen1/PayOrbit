@@ -6,8 +6,9 @@ export async function listPayslipsHandler(req: Request, res: Response, next: Nex
   try {
     const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
     const payRunId = typeof req.query.payRunId === 'string' ? req.query.payRunId : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const pagination = parsePagination(req.query as { page?: number; limit?: number });
-    const { items, meta } = await payslipService.listPayslips({ employeeId, payRunId }, pagination);
+    const { items, meta } = await payslipService.listPayslips({ employeeId, payRunId, search }, pagination);
     res.success(items, 200, meta);
   } catch (err) {
     next(err);

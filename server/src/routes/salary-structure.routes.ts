@@ -21,7 +21,9 @@ const MANAGE_ROLES = [UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
-const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
+const listQuerySchema = z.object({
+  query: z.object({ search: z.string().trim().min(1).optional(), ...paginationQuerySchema }),
+});
 
 const createSalaryStructureSchema = z.object({
   body: z.object({
@@ -46,6 +48,11 @@ const updateSalaryStructureSchema = z.object({
  *     tags: [Salary Structures]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive partial match on structure name.
  *     responses:
  *       200:
  *         description: List of salary structures.

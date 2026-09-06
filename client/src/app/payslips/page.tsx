@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -73,15 +74,25 @@ function PayslipsPageContent() {
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
   const canAccess = !!user && PAYSLIP_ROLES.includes(user.role);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [payslipsRes, payRunsRes] = await Promise.all([
         api.get<{ data: Payslip[]; meta: PaginationMeta }>('/payslips', {
-          params: { ...(payRunIdFilter ? { payRunId: payRunIdFilter } : {}), page },
+          params: { ...(payRunIdFilter ? { payRunId: payRunIdFilter } : {}), ...(search ? { search } : {}), page },
         }),
         api.get<{ data: PayRun[] }>('/pay-runs', { params: { limit: 100 } }),
       ]);
@@ -98,7 +109,7 @@ function PayslipsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [payRunIdFilter, showToast, page]);
+  }, [payRunIdFilter, search, showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -122,6 +133,12 @@ function PayslipsPageContent() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        <Input
+          placeholder="Search by employee name…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-64"
+        />
         <Select
           placeholder="All periods"
           options={payRuns.map((p) => ({ value: p.id, label: `${p.name} (${p.periodStart} → ${p.periodEnd})` }))}

@@ -20,16 +20,24 @@ function generateTemporaryPassword() {
 }
 
 export async function listUsersForAdmin(
-  filter?: { role?: UserRole },
+  filter?: { role?: UserRole; search?: string },
   pagination: PaginationParams = parsePagination({})
 ) {
-  const [users, total] = await userRepository().findAndCount({
-    where: filter?.role ? { role: filter.role } : {},
-    relations: ['employee'],
-    order: { createdAt: 'DESC' },
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+  const qb = userRepository()
+    .createQueryBuilder('user')
+    .leftJoinAndSelect('user.employee', 'employee')
+    .orderBy('user.createdAt', 'DESC')
+    .skip(pagination.skip)
+    .take(pagination.take);
+
+  if (filter?.role) {
+    qb.andWhere('user.role = :role', { role: filter.role });
+  }
+  if (filter?.search) {
+    qb.andWhere('(user.email ILIKE :search OR employee.full_name ILIKE :search)', { search: `%${filter.search}%` });
+  }
+
+  const [users, total] = await qb.getManyAndCount();
   return { items: users.map(toPublicUser), meta: buildPaginationMeta(pagination, total) };
 }
 

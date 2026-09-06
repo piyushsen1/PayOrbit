@@ -20,3 +20,12 @@ export async function loginHandler(req: Request, res: Response, next: NextFuncti
     next(err);
   }
 }
+
+export async function getMeHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = await authService.getCurrentUser(req.user!.sub);
+    res.success(user);
+  } catch (err) {
+    next(err);
+  }
+}

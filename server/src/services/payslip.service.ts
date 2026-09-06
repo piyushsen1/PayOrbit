@@ -8,19 +8,23 @@ import { parsePagination, buildPaginationMeta, type PaginationParams } from '../
 const payslipRepository = () => AppDataSource.getRepository(Payslip);
 
 export async function listPayslips(
-  filter?: { employeeId?: string; payRunId?: string },
+  filter?: { employeeId?: string; payRunId?: string; search?: string },
   pagination: PaginationParams = parsePagination({})
 ) {
-  const [items, total] = await payslipRepository().findAndCount({
-    where: {
-      ...(filter?.employeeId ? { employeeId: filter.employeeId } : {}),
-      ...(filter?.payRunId ? { payRunId: filter.payRunId } : {}),
-    },
-    relations: ['employee', 'payRun', 'payRun.salaryStructure'],
-    order: { createdAt: 'DESC' },
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+  const qb = payslipRepository()
+    .createQueryBuilder('payslip')
+    .leftJoinAndSelect('payslip.employee', 'employee')
+    .leftJoinAndSelect('payslip.payRun', 'payRun')
+    .leftJoinAndSelect('payRun.salaryStructure', 'salaryStructure')
+    .orderBy('payslip.createdAt', 'DESC')
+    .skip(pagination.skip)
+    .take(pagination.take);
+
+  if (filter?.employeeId) qb.andWhere('payslip.employee_id = :employeeId', { employeeId: filter.employeeId });
+  if (filter?.payRunId) qb.andWhere('payslip.pay_run_id = :payRunId', { payRunId: filter.payRunId });
+  if (filter?.search) qb.andWhere('employee.full_name ILIKE :search', { search: `%${filter.search}%` });
+
+  const [items, total] = await qb.getManyAndCount();
   return { items, meta: buildPaginationMeta(pagination, total) };
 }
 

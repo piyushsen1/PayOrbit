@@ -105,19 +105,22 @@ export async function getOvertimeRollup(filter: { periodStart: string; periodEnd
 }
 
 export async function listAttendance(
-  filter?: { employeeId?: string; date?: string },
+  filter?: { employeeId?: string; date?: string; status?: AttendanceStatus; search?: string },
   pagination: PaginationParams = parsePagination({})
 ) {
-  const [records, total] = await attendanceRepository().findAndCount({
-    where: {
-      ...(filter?.employeeId ? { employeeId: filter.employeeId } : {}),
-      ...(filter?.date ? { date: filter.date } : {}),
-    },
-    relations: ['employee'],
-    order: { date: 'DESC' },
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+  const qb = attendanceRepository()
+    .createQueryBuilder('attendance')
+    .leftJoinAndSelect('attendance.employee', 'employee')
+    .orderBy('attendance.date', 'DESC')
+    .skip(pagination.skip)
+    .take(pagination.take);
+
+  if (filter?.employeeId) qb.andWhere('attendance.employee_id = :employeeId', { employeeId: filter.employeeId });
+  if (filter?.date) qb.andWhere('attendance.date = :date', { date: filter.date });
+  if (filter?.status) qb.andWhere('attendance.status = :status', { status: filter.status });
+  if (filter?.search) qb.andWhere('employee.full_name ILIKE :search', { search: `%${filter.search}%` });
+
+  const [records, total] = await qb.getManyAndCount();
   const items = await Promise.all(records.map((r) => withWorkedHoursAndOvertime(r, r.employee)));
   return { items, meta: buildPaginationMeta(pagination, total) };
 }

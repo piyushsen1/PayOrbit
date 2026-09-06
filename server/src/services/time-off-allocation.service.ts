@@ -46,16 +46,26 @@ async function withBalance(allocation: TimeOffAllocation) {
 }
 
 export async function listAllocations(
-  filter?: { employeeId?: string },
+  filter?: { employeeId?: string; status?: TimeOffAllocationStatus; search?: string },
   pagination: PaginationParams = parsePagination({})
 ) {
-  const [allocations, total] = await allocationRepository().findAndCount({
-    where: filter?.employeeId ? { employeeId: filter.employeeId } : {},
-    relations: ['employee', 'timeOffType'],
-    order: { createdAt: 'DESC' },
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+  const qb = allocationRepository()
+    .createQueryBuilder('allocation')
+    .leftJoinAndSelect('allocation.employee', 'employee')
+    .leftJoinAndSelect('allocation.timeOffType', 'timeOffType')
+    .orderBy('allocation.createdAt', 'DESC')
+    .skip(pagination.skip)
+    .take(pagination.take);
+
+  if (filter?.employeeId) qb.andWhere('allocation.employee_id = :employeeId', { employeeId: filter.employeeId });
+  if (filter?.status) qb.andWhere('allocation.status = :status', { status: filter.status });
+  if (filter?.search) {
+    qb.andWhere('(employee.full_name ILIKE :search OR timeOffType.name ILIKE :search)', {
+      search: `%${filter.search}%`,
+    });
+  }
+
+  const [allocations, total] = await qb.getManyAndCount();
   const items = await Promise.all(allocations.map(withBalance));
   return { items, meta: buildPaginationMeta(pagination, total) };
 }

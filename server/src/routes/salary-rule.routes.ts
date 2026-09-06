@@ -24,7 +24,12 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
 
 const listQuerySchema = z.object({
-  query: z.object({ salaryStructureId: z.string().uuid().optional(), ...paginationQuerySchema }),
+  query: z.object({
+    salaryStructureId: z.string().uuid().optional(),
+    search: z.string().trim().min(1).optional(),
+    category: z.nativeEnum(SalaryRuleCategory).optional(),
+    ...paginationQuerySchema,
+  }),
 });
 
 const ruleBodyBase = {
@@ -70,6 +75,13 @@ const updateSalaryRuleSchema = z.object({
  *         schema:
  *           type: string
  *           format: uuid
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive partial match on rule name.
+ *       - in: query
+ *         name: category
+ *         schema: { type: string, enum: [basic, allowance, deduction, gross, net] }
  *     responses:
  *       200:
  *         description: List of salary rules.

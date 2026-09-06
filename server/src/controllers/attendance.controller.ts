@@ -5,6 +5,7 @@ import { UserRole } from '../entities/User';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
 import { parsePagination } from '../utils/pagination';
+import { AttendanceStatus } from '../entities/Attendance';
 
 const HR_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
 
@@ -13,12 +14,14 @@ export async function listAttendanceHandler(req: Request, res: Response, next: N
     const isHr = !!req.user && HR_ROLES.includes(req.user.role);
     const queryEmployeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
     const date = typeof req.query.date === 'string' ? req.query.date : undefined;
+    const status = typeof req.query.status === 'string' ? (req.query.status as AttendanceStatus) : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
 
     // Employees (non-HR) only ever see their own attendance, regardless of what they pass in the query.
     const employeeId = isHr ? queryEmployeeId : await getLinkedEmployeeId(req.user!.sub);
     const pagination = parsePagination(req.query as { page?: number; limit?: number });
 
-    const { items, meta } = await attendanceService.listAttendance({ employeeId, date }, pagination);
+    const { items, meta } = await attendanceService.listAttendance({ employeeId, date, status, search }, pagination);
     res.success(items, 200, meta);
   } catch (err) {
     next(err);

@@ -1,11 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import * as payRunService from '../services/pay-run.service';
 import { parsePagination } from '../utils/pagination';
+import { PayRunStatus } from '../entities/PayRun';
 
 export async function listPayRunsHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const pagination = parsePagination(req.query as { page?: number; limit?: number });
-    const { items, meta } = await payRunService.listPayRuns(pagination);
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const status = typeof req.query.status === 'string' ? (req.query.status as PayRunStatus) : undefined;
+    const { items, meta } = await payRunService.listPayRuns({ search, status }, pagination);
     res.success(items, 200, meta);
   } catch (err) {
     next(err);

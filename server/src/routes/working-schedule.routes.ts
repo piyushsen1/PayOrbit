@@ -31,13 +31,20 @@ const dayInputSchema = z.object({
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
+const daysArraySchema = z
+  .array(dayInputSchema)
+  .min(1, 'Add at least one day.')
+  .refine((days) => new Set(days.map((d) => d.dayOfWeek)).size === days.length, {
+    message: 'Each day can only appear once in a schedule — remove the duplicate.',
+  });
+
 const createWorkingScheduleSchema = z.object({
   body: z.object({
     name: z.string().min(1, 'Schedule name is required.'),
     company: z.string().min(1, 'Company is required.'),
     timezone: z.string().min(1).optional(),
     status: z.nativeEnum(WorkingScheduleStatus).optional(),
-    days: z.array(dayInputSchema).min(1, 'Add at least one day.'),
+    days: daysArraySchema,
   }),
 });
 
@@ -48,12 +55,18 @@ const updateWorkingScheduleSchema = z.object({
     company: z.string().min(1).optional(),
     timezone: z.string().min(1).optional(),
     status: z.nativeEnum(WorkingScheduleStatus).optional(),
-    days: z.array(dayInputSchema).min(1).optional(),
+    days: daysArraySchema.optional(),
   }),
 });
 
 const idParamOnlySchema = z.object({ params: idParamSchema });
-const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
+const listQuerySchema = z.object({
+  query: z.object({
+    search: z.string().trim().min(1).optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+    ...paginationQuerySchema,
+  }),
+});
 
 /**
  * @openapi
@@ -63,6 +76,14 @@ const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
  *     tags: [Working Schedules]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive partial match on schedule name.
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [active, inactive] }
  *     responses:
  *       200:
  *         description: List of working schedules.

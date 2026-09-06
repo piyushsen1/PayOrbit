@@ -24,6 +24,7 @@ const listQuerySchema = z.object({
   query: z.object({
     employeeId: z.string().uuid().optional(),
     payRunId: z.string().uuid().optional(),
+    search: z.string().trim().min(1).optional(),
     ...paginationQuerySchema,
   }),
 });
@@ -47,6 +48,11 @@ const listQuerySchema = z.object({
  *         schema:
  *           type: string
  *           format: uuid
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial match against the linked employee's full name.
  *     responses:
  *       200:
  *         description: List of payslips.

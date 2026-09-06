@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,15 +57,30 @@ export default function SalaryStructuresPage() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const canView = !!user && READ_ROLES.includes(user.role);
   const canManage = !!user && MANAGE_ROLES.includes(user.role);
+
+  // Debounce the free-text search before it drives a refetch.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Search is structures server-side, so its result set (and page count) can change —
+  // land back on page 1 rather than risk showing an out-of-range empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [structuresRes, contractsRes] = await Promise.all([
-        api.get<{ data: SalaryStructure[]; meta: PaginationMeta }>('/salary-structures', { params: { page } }),
+        api.get<{ data: SalaryStructure[]; meta: PaginationMeta }>('/salary-structures', {
+          params: { page, search: debouncedSearch || undefined },
+        }),
         api
           .get<{ data: Contract[] }>('/contracts', { params: { limit: 100 } })
           .catch(() => ({ data: { data: [] as Contract[] } })),
@@ -90,17 +105,11 @@ export default function SalaryStructuresPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, page]);
+  }, [showToast, page, debouncedSearch]);
 
   useEffect(() => {
     if (canView) loadData();
   }, [canView, loadData]);
-
-  const filtered = useMemo(() => {
-    if (!search) return structures;
-    const needle = search.toLowerCase();
-    return structures.filter((s) => s.name.toLowerCase().includes(needle));
-  }, [structures, search]);
 
   if (authLoading) return null;
 
@@ -135,7 +144,7 @@ export default function SalaryStructuresPage() {
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : filtered.length === 0 ? (
+      ) : structures.length === 0 ? (
         <EmptyState title="No salary structures yet" description="Create the first structure to get started." />
       ) : (
         <Table>
@@ -148,7 +157,7 @@ export default function SalaryStructuresPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.map((s) => (
+            {structures.map((s) => (
               <TableRow key={s.id} className="cursor-pointer" onClick={() => router.push(`/salary-structures/${s.id}`)}>
                 <TableCell className="font-medium">{s.name}</TableCell>
                 <TableCell className="num">{s.rulesCount}</TableCell>

@@ -16,6 +16,7 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCodes.DUPLICATE_RESOURCE]: 'That already exists.',
   [ErrorCodes.INTERNAL_ERROR]: 'Something went wrong on our end. Please try again.',
   [ErrorCodes.EMAIL_NOT_CONFIGURED]: 'Email sending is not set up yet — ask an admin to configure SMTP.',
+  [ErrorCodes.ACCOUNT_INACTIVE]: 'This account has been deactivated. Contact an administrator.',
 };
 
 const FALLBACK_MESSAGE = 'Something went wrong. Please try again.';

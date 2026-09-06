@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -194,7 +195,8 @@ export function TimeOffTypeFormView({ mode, typeId }: TimeOffTypeFormViewProps) 
 
   return (
     <Container className="flex flex-col gap-6 py-10">
-      <div>
+      <div className="flex flex-col gap-2">
+        <BackButton href="/time-off-types" label="Back to Time Off Types" />
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
           {mode === 'create' ? 'New Time Off Type' : `Time Off Type / ${name}`}
         </h1>

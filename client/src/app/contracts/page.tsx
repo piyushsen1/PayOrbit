@@ -9,6 +9,7 @@ import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -18,6 +19,12 @@ import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
 const CONTRACTS_MODULE_ROLES: Role[] = ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'];
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All statuses' },
+  { value: 'running', label: 'Running' },
+  { value: 'expired', label: 'Expired' },
+];
 
 interface Employee {
   id: string;
@@ -84,15 +91,34 @@ function ContractsPageContent() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const canAccess = !!user && CONTRACTS_MODULE_ROLES.includes(user.role);
+
+  // Debounce the free-text search before it drives a refetch.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Search/status are filtered server-side, so their result set (and page count) can
+  // change — land back on page 1 rather than risk showing an out-of-range empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [contractsRes, employeesRes] = await Promise.all([
         api.get<{ data: Contract[]; meta: PaginationMeta }>('/contracts', {
-          params: { ...(employeeIdFilter ? { employeeId: employeeIdFilter } : {}), page },
+          params: {
+            ...(employeeIdFilter ? { employeeId: employeeIdFilter } : {}),
+            page,
+            search: debouncedSearch || undefined,
+            status: statusFilter || undefined,
+          },
         }),
         api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
       ]);
@@ -109,21 +135,13 @@ function ContractsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeIdFilter, showToast, page]);
+  }, [employeeIdFilter, showToast, page, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     if (canAccess) loadData();
   }, [canAccess, loadData]);
 
   const employeeNameById = useMemo(() => new Map(employees.map((e) => [e.id, e.fullName])), [employees]);
-
-  const filtered = useMemo(() => {
-    if (!search) return contracts;
-    const needle = search.toLowerCase();
-    return contracts.filter((c) =>
-      `${c.contractNumber} ${employeeNameById.get(c.employeeId) ?? ''}`.toLowerCase().includes(needle)
-    );
-  }, [contracts, search, employeeNameById]);
 
   if (authLoading) return null;
 
@@ -154,11 +172,19 @@ function ContractsPageContent() {
             className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
           />
         </div>
+
+        <Select
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Status Filter"
+          className="w-44"
+        />
       </div>
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : filtered.length === 0 ? (
+      ) : contracts.length === 0 ? (
         <EmptyState title="No contracts found" description="Create a contract to get started." />
       ) : (
         <Table>
@@ -173,7 +199,7 @@ function ContractsPageContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.map((c) => (
+            {contracts.map((c) => (
               <TableRow key={c.id} className="cursor-pointer" onClick={() => router.push(`/contracts/${c.id}`)}>
                 <TableCell className="num font-medium">{c.contractNumber}</TableCell>
                 <TableCell>{employeeNameById.get(c.employeeId) ?? '—'}</TableCell>

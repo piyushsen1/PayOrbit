@@ -1,3 +1,4 @@
+import { ILike } from 'typeorm';
 import { AppDataSource } from '../config/data-source';
 import { WorkingSchedule, WorkingScheduleStatus } from '../entities/WorkingSchedule';
 import { DayOfWeek, WorkingScheduleDay } from '../entities/WorkingScheduleDay';
@@ -26,8 +27,16 @@ function computeWeeklyHours(days: WorkingScheduleDayInput[]): string {
   return (totalMinutes / 60).toFixed(2);
 }
 
-export async function listWorkingSchedules(pagination: PaginationParams = parsePagination({})) {
+export async function listWorkingSchedules(
+  filter?: { search?: string; status?: WorkingScheduleStatus },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const where: Record<string, unknown> = {};
+  if (filter?.search) where.name = ILike(`%${filter.search}%`);
+  if (filter?.status) where.status = filter.status;
+
   const [schedules, total] = await workingScheduleRepository().findAndCount({
+    where,
     relations: ['days'],
     order: { name: 'ASC' },
     skip: pagination.skip,

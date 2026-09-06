@@ -61,15 +61,30 @@ async function assertNoRunningConflict(employeeId: string, endDate: string | nul
 }
 
 export async function listContracts(
-  filter?: { employeeId?: string },
+  filter?: { employeeId?: string; search?: string; status?: ContractStatus },
   pagination: PaginationParams = parsePagination({})
 ) {
-  const [contracts, total] = await contractRepository().findAndCount({
-    where: filter?.employeeId ? { employeeId: filter.employeeId } : {},
-    order: { startDate: 'DESC' },
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+  const qb = contractRepository()
+    .createQueryBuilder('contract')
+    .leftJoin('contract.employee', 'employee')
+    .orderBy('contract.startDate', 'DESC')
+    .skip(pagination.skip)
+    .take(pagination.take);
+
+  if (filter?.employeeId) {
+    qb.andWhere('contract.employee_id = :employeeId', { employeeId: filter.employeeId });
+  }
+  if (filter?.search) {
+    qb.andWhere('employee.full_name ILIKE :search', { search: `%${filter.search}%` });
+  }
+  // Mirrors computeContractStatus: no end date, or an end date not yet past, is Running.
+  if (filter?.status === 'running') {
+    qb.andWhere('(contract.end_date IS NULL OR contract.end_date >= CURRENT_DATE)');
+  } else if (filter?.status === 'expired') {
+    qb.andWhere('contract.end_date < CURRENT_DATE');
+  }
+
+  const [contracts, total] = await qb.getManyAndCount();
   return { items: contracts.map(withStatus), meta: buildPaginationMeta(pagination, total) };
 }
 

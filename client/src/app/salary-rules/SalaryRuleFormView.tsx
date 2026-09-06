@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -21,7 +22,7 @@ type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager'
 const READ_ROLES: Role[] = ['hr_payroll_user', 'hr_payroll_manager', 'admin'];
 const MANAGE_ROLES: Role[] = ['hr_payroll_manager', 'admin'];
 
-const CATEGORY_OPTIONS = [
+export const CATEGORY_OPTIONS = [
   { value: 'basic', label: 'Basic' },
   { value: 'allowance', label: 'Allowance' },
   { value: 'deduction', label: 'Deduction' },
@@ -230,7 +231,8 @@ export function SalaryRuleFormView({ mode, ruleId, initialStructureId }: SalaryR
 
   return (
     <Container className="flex flex-col gap-6 py-10">
-      <div>
+      <div className="flex flex-col gap-2">
+        <BackButton href="/salary-rules" label="Back to Salary Rules" />
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
           {mode === 'create' ? 'New Salary Rule' : `Salary Rule / ${name}`}
         </h1>

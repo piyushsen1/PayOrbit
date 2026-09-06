@@ -32,6 +32,8 @@ const listQuerySchema = z.object({
   query: z.object({
     employeeId: z.string().uuid().optional(),
     date: z.string().date().optional(),
+    status: z.nativeEnum(AttendanceStatus).optional(),
+    search: z.string().trim().min(1).optional(),
     ...paginationQuerySchema,
   }),
 });
@@ -85,6 +87,16 @@ async function resolveAttendanceOwnerUserId(attendanceId: string): Promise<strin
  *         schema:
  *           type: string
  *           format: date
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [present, late, absent]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial match against the linked employee's full name.
  *     responses:
  *       200:
  *         description: List of attendance records, with derived workedHours/overtime.

@@ -9,6 +9,8 @@ import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -19,6 +21,11 @@ type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager'
 
 const PAY_RUN_ROLES: Role[] = ['hr_payroll_user', 'hr_payroll_manager', 'admin'];
 const STATUS_VARIANT: Record<string, BadgeVariant> = { draft: 'neutral', validated: 'info', paid: 'success' };
+const STATUS_OPTIONS = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'validated', label: 'Validated' },
+  { value: 'paid', label: 'Paid' },
+];
 
 interface PayRun {
   id: string;
@@ -43,13 +50,27 @@ export default function PayRunsPage() {
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
   const canAccess = !!user && PAY_RUN_ROLES.includes(user.role);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data } = await api.get<{ data: PayRun[]; meta: PaginationMeta }>('/pay-runs', { params: { page } });
+      const params: Record<string, string | number> = { page };
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
+      const { data } = await api.get<{ data: PayRun[]; meta: PaginationMeta }>('/pay-runs', { params });
       setPayRuns(data.data);
       setMeta(data.meta);
     } catch (err) {
@@ -62,7 +83,7 @@ export default function PayRunsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, page]);
+  }, [statusFilter, search, showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -87,6 +108,22 @@ export default function PayRunsPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={() => router.push('/pay-runs/new')}>+ New Pay Run</Button>
+        <Input
+          placeholder="Search by name…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-64"
+        />
+        <Select
+          placeholder="All statuses"
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          className="w-44"
+        />
       </div>
 
       {isLoading ? (

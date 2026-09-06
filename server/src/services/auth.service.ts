@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { AppDataSource } from '../config/data-source';
 import { env } from '../config/env';
-import { User, UserRole } from '../entities/User';
+import { User, UserRole, UserStatus } from '../entities/User';
 import { AppError } from '../utils/AppError';
 import { ErrorCodes } from '../utils/error-codes';
 
@@ -35,6 +35,14 @@ export async function signup(email: string, password: string) {
   return { token: signToken(user), user: toPublicUser(user) };
 }
 
+export async function getCurrentUser(id: string) {
+  const user = await userRepository().findOne({ where: { id } });
+  if (!user) {
+    throw new AppError(ErrorCodes.UNAUTHORIZED, 'User not found.', 401);
+  }
+  return toPublicUser(user);
+}
+
 /** Resolves the Employee id linked to a logged-in user's account — used by self-service flows (attendance check-in/out, own time-off records). */
 export async function getLinkedEmployeeId(userId: string): Promise<string> {
   const user = await userRepository().findOne({ where: { id: userId } });
@@ -55,6 +63,10 @@ export async function login(email: string, password: string) {
   const passwordMatches = await bcrypt.compare(password, user.passwordHash);
   if (!passwordMatches) {
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 'Invalid email or password.', 401);
+  }
+
+  if (user.status === UserStatus.INACTIVE) {
+    throw new AppError(ErrorCodes.ACCOUNT_INACTIVE, 'This account has been deactivated. Contact an administrator.', 403);
   }
 
   return { token: signToken(user), user: toPublicUser(user) };

@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
+import { PayRunStatus } from '../entities/PayRun';
 import { paginationQuerySchema } from '../utils/pagination';
 import {
   listPayRunsHandler,
@@ -24,7 +25,13 @@ const DELETE_ROLES = [UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
-const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
+const listQuerySchema = z.object({
+  query: z.object({
+    search: z.string().trim().min(1).optional(),
+    status: z.nativeEnum(PayRunStatus).optional(),
+    ...paginationQuerySchema,
+  }),
+});
 
 const createPayRunSchema = z.object({
   body: z.object({
@@ -44,6 +51,17 @@ const createPayRunSchema = z.object({
  *     tags: [Pay Runs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial match against the pay run's name.
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [draft, validated, paid]
  *     responses:
  *       200:
  *         description: List of pay runs.

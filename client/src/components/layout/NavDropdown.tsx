@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export interface NavDropdownItem {
   href: string;
@@ -11,9 +12,10 @@ export interface NavDropdownItem {
 export interface NavDropdownProps {
   label: string;
   items: NavDropdownItem[];
+  className?: string;
 }
 
-export function NavDropdown({ label, items }: NavDropdownProps) {
+export function NavDropdown({ label, items, className }: NavDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -27,15 +29,20 @@ export function NavDropdown({ label, items }: NavDropdownProps) {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={cn('relative shrink-0', className)}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
-        className="flex items-center gap-1 text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-link)]"
+        className={cn(
+          'flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-sunken)] hover:text-[var(--text-link)]',
+          open && 'bg-[var(--surface-sunken)] text-[var(--text-link)]'
+        )}
       >
         {label}
-        <span aria-hidden="true">▾</span>
+        <span aria-hidden="true" className={cn('text-xs transition-transform', open && 'rotate-180')}>
+          ▾
+        </span>
       </button>
       {open && (
         <div className="absolute left-0 top-full z-20 mt-2 min-w-[190px] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1 shadow-glow-sm">

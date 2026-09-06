@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -78,6 +79,7 @@ export function TimeOffAllocationFormView({ mode, allocationId }: TimeOffAllocat
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeciding, setIsDeciding] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isHr = !!user && HR_ROLES.includes(user.role);
 
@@ -90,7 +92,7 @@ export function TimeOffAllocationFormView({ mode, allocationId }: TimeOffAllocat
           return;
         }
         const [employeesRes, typesRes] = await Promise.all([
-          api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+          api.get<{ data: Employee[] }>('/employees', { params: { limit: 100, status: 'active' } }),
           api.get<{ data: TimeOffType[] }>('/time-off-types', { params: { limit: 100 } }),
         ]);
         setEmployees(employeesRes.data.data);
@@ -202,6 +204,26 @@ export function TimeOffAllocationFormView({ mode, allocationId }: TimeOffAllocat
     }
   }
 
+  async function handleDelete() {
+    if (!allocationId) return;
+    if (!window.confirm('Delete this allocation? This cannot be undone.')) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/time-off-allocations/${allocationId}`);
+      showToast({ title: 'Allocation deleted', variant: 'success' });
+      router.push('/time-off-allocations');
+    } catch (err) {
+      const axiosErr = err as AxiosError<ApiErrorBody>;
+      showToast({
+        title: 'Failed to delete allocation',
+        description: getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message),
+        variant: 'danger',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   if (authLoading || isLoading) {
     return (
       <Container className="flex flex-col gap-3 py-10">
@@ -233,7 +255,8 @@ export function TimeOffAllocationFormView({ mode, allocationId }: TimeOffAllocat
   return (
     <Container className="flex flex-col gap-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="flex flex-col gap-2">
+          <BackButton href="/time-off-allocations" label="Back to Allocations" />
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
             {mode === 'create' ? 'New Allocation' : `Allocation / ${employeeName}`}
           </h1>
@@ -301,13 +324,22 @@ export function TimeOffAllocationFormView({ mode, allocationId }: TimeOffAllocat
             </p>
           )}
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => router.push('/time-off-allocations')}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} isLoading={isSubmitting}>
-              {mode === 'create' ? 'Create Allocation' : 'Save'}
-            </Button>
+          <div className="flex justify-between gap-2">
+            {mode === 'edit' ? (
+              <Button variant="danger" onClick={handleDelete} isLoading={isDeleting}>
+                Delete
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => router.push('/time-off-allocations')}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} isLoading={isSubmitting}>
+                {mode === 'create' ? 'Create Allocation' : 'Save'}
+              </Button>
+            </div>
           </div>
         </CardBody>
       </Card>

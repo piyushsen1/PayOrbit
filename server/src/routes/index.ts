@@ -13,6 +13,7 @@ import timeOffRequestRoutes from './time-off-request.routes';
 import payRunRoutes from './pay-run.routes';
 import payslipRoutes from './payslip.routes';
 import dashboardRoutes from './dashboard.routes';
+import holidayRoutes from './holiday.routes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/time-off-requests', timeOffRequestRoutes);
 router.use('/pay-runs', payRunRoutes);
 router.use('/payslips', payslipRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/holidays', holidayRoutes);
 
 export default router;

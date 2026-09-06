@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +10,7 @@ import { Container } from '@/components/layout/Container';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { Avatar } from '@/components/ui/Avatar';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -36,6 +37,12 @@ interface ApiErrorBody {
 /** Per root CLAUDE.md roles table: HR Manager and every payroll/admin role above it. */
 const EMPLOYEE_MODULE_ROLES: Role[] = ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'];
 
+const STATUS_OPTIONS = [
+  { value: '', label: 'All statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
 type ViewMode = 'kanban' | 'list';
 
 function SearchIcon() {
@@ -57,14 +64,30 @@ export default function EmployeesPage() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [view, setView] = useState<ViewMode>('kanban');
 
   const canView = !!user && EMPLOYEE_MODULE_ROLES.includes(user.role);
 
+  // Debounce the free-text search before it drives a refetch.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Search/status are filtered server-side, so their result set (and page count) can
+  // change — land back on page 1 rather than risk showing an out-of-range empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
   const loadEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data } = await api.get<{ data: Employee[]; meta: PaginationMeta }>('/employees', { params: { page } });
+      const { data } = await api.get<{ data: Employee[]; meta: PaginationMeta }>('/employees', {
+        params: { page, search: debouncedSearch || undefined, status: statusFilter || undefined },
+      });
       setEmployees(data.data);
       setMeta(data.meta);
     } catch (err) {
@@ -77,19 +100,11 @@ export default function EmployeesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, page]);
+  }, [showToast, page, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     if (canView) loadEmployees();
   }, [canView, loadEmployees]);
-
-  const filteredEmployees = useMemo(() => {
-    if (!search) return employees;
-    const needle = search.toLowerCase();
-    return employees.filter((e) =>
-      `${e.fullName} ${e.workEmail} ${e.jobPosition ?? ''} ${e.department ?? ''}`.toLowerCase().includes(needle)
-    );
-  }, [employees, search]);
 
   if (authLoading) {
     return (
@@ -128,6 +143,14 @@ export default function EmployeesPage() {
           />
         </div>
 
+        <Select
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Status Filter"
+          className="w-44"
+        />
+
         <div className="flex gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1">
           <Button
             type="button"
@@ -145,11 +168,11 @@ export default function EmployeesPage() {
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : filteredEmployees.length === 0 ? (
+      ) : employees.length === 0 ? (
         <EmptyState title="No employees yet" description="Create the first employee record to get started." />
       ) : view === 'kanban' ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredEmployees.map((e) => (
+          {employees.map((e) => (
             <Card
               key={e.id}
               className="cursor-pointer p-5 shadow-glow-xs transition hover:shadow-glow-sm"
@@ -183,7 +206,7 @@ export default function EmployeesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredEmployees.map((e) => (
+            {employees.map((e) => (
               <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(`/employees/${e.id}`)}>
                 <TableCell className="font-medium">{e.fullName}</TableCell>
                 <TableCell>{e.workEmail}</TableCell>

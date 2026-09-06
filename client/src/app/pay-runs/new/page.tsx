@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -84,7 +85,7 @@ export default function NewPayRunPage() {
     try {
       const [structuresRes, employeesRes, contractsRes, schedulesRes] = await Promise.all([
         api.get<{ data: SalaryStructure[] }>('/salary-structures', { params: { limit: 100 } }),
-        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100, status: 'active' } }),
         api.get<{ data: Contract[] }>('/contracts', { params: { limit: 100 } }),
         api
           .get<{ data: WorkingSchedule[] }>('/working-schedules', { params: { limit: 100 } })
@@ -197,7 +198,8 @@ export default function NewPayRunPage() {
 
   return (
     <Container className="flex flex-col gap-6 py-10">
-      <div>
+      <div className="flex flex-col gap-2">
+        <BackButton href="/pay-runs" label="Back to Pay Runs" />
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">New Pay Run</h1>
         <p className="text-xs text-[var(--text-tertiary)]">
           {step === 1 ? 'Define payroll scope' : 'Choose who is in this run'}

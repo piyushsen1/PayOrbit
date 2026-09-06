@@ -6,7 +6,7 @@ import { roleGuard } from '../middleware/roleGuard';
 import { canAccessOwnRecord } from '../middleware/canAccessOwnRecord';
 import { UserRole } from '../entities/User';
 import { AppDataSource } from '../config/data-source';
-import { TimeOffAllocation } from '../entities/TimeOffAllocation';
+import { TimeOffAllocation, TimeOffAllocationStatus } from '../entities/TimeOffAllocation';
 import { User } from '../entities/User';
 import { paginationQuerySchema } from '../utils/pagination';
 import {
@@ -28,7 +28,12 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
 
 const listQuerySchema = z.object({
-  query: z.object({ employeeId: z.string().uuid().optional(), ...paginationQuerySchema }),
+  query: z.object({
+    employeeId: z.string().uuid().optional(),
+    status: z.nativeEnum(TimeOffAllocationStatus).optional(),
+    search: z.string().trim().min(1).optional(),
+    ...paginationQuerySchema,
+  }),
 });
 
 const createAllocationSchema = z.object({
@@ -67,6 +72,17 @@ async function resolveAllocationOwnerUserId(allocationId: string): Promise<strin
  *     tags: [Time Off Allocations]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, refused]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial match against the linked employee's full name or time off type name.
  *     responses:
  *       200:
  *         description: List of allocations.

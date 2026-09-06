@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,14 +51,27 @@ export default function WorkingSchedulesPage() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const canAccess = !!user && WORKING_SCHEDULE_MODULE_ROLES.includes(user.role);
+
+  // Debounce the free-text search before it drives a refetch.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Search is schedules server-side, so its result set (and page count) can change —
+  // land back on page 1 rather than risk showing an out-of-range empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data } = await api.get<{ data: WorkingSchedule[]; meta: PaginationMeta }>('/working-schedules', {
-        params: { page },
+        params: { page, search: debouncedSearch || undefined },
       });
       setSchedules(data.data);
       setMeta(data.meta);
@@ -72,17 +85,11 @@ export default function WorkingSchedulesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, page]);
+  }, [showToast, page, debouncedSearch]);
 
   useEffect(() => {
     if (canAccess) loadData();
   }, [canAccess, loadData]);
-
-  const filtered = useMemo(() => {
-    if (!search) return schedules;
-    const needle = search.toLowerCase();
-    return schedules.filter((s) => `${s.name} ${s.company}`.toLowerCase().includes(needle));
-  }, [schedules, search]);
 
   if (authLoading) return null;
 
@@ -117,7 +124,7 @@ export default function WorkingSchedulesPage() {
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : filtered.length === 0 ? (
+      ) : schedules.length === 0 ? (
         <EmptyState title="No working schedules yet" description="Create the first weekly pattern to get started." />
       ) : (
         <Table>
@@ -131,7 +138,7 @@ export default function WorkingSchedulesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.map((s) => (
+            {schedules.map((s) => (
               <TableRow key={s.id} className="cursor-pointer" onClick={() => router.push(`/working-schedules/${s.id}`)}>
                 <TableCell className="font-medium">{s.name}</TableCell>
                 <TableCell className="num">{s.daysPerWeek}</TableCell>

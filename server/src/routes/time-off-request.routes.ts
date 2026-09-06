@@ -6,7 +6,7 @@ import { roleGuard } from '../middleware/roleGuard';
 import { canAccessOwnRecord } from '../middleware/canAccessOwnRecord';
 import { UserRole } from '../entities/User';
 import { AppDataSource } from '../config/data-source';
-import { TimeOffRequest } from '../entities/TimeOffRequest';
+import { TimeOffRequest, TimeOffRequestStatus } from '../entities/TimeOffRequest';
 import { User } from '../entities/User';
 import { paginationQuerySchema } from '../utils/pagination';
 import {
@@ -28,7 +28,12 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
 
 const listQuerySchema = z.object({
-  query: z.object({ employeeId: z.string().uuid().optional(), ...paginationQuerySchema }),
+  query: z.object({
+    employeeId: z.string().uuid().optional(),
+    status: z.nativeEnum(TimeOffRequestStatus).optional(),
+    search: z.string().trim().min(1).optional(),
+    ...paginationQuerySchema,
+  }),
 });
 
 const createRequestSchema = z.object({
@@ -71,6 +76,17 @@ const ownRecordGuard = canAccessOwnRecord((req) => resolveRequestOwnerUserId(req
  *     tags: [Time Off Requests]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, refused]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial match against the linked employee's full name.
  *     responses:
  *       200:
  *         description: List of requests.
@@ -175,7 +191,7 @@ router.patch('/:id', authGuard, validate(updateRequestSchema), ownRecordGuard, u
  * @openapi
  * /api/time-off-requests/{id}:
  *   delete:
- *     summary: Delete/cancel a request (owner or HR roles)
+ *     summary: Delete/cancel a request (owner or HR roles) — only while still pending
  *     tags: [Time Off Requests]
  *     security:
  *       - bearerAuth: []
@@ -193,6 +209,8 @@ router.patch('/:id', authGuard, validate(updateRequestSchema), ownRecordGuard, u
  *         description: Not the request's owner and not an HR/payroll role.
  *       404:
  *         description: Not found.
+ *       422:
+ *         description: Only pending requests can be cancelled.
  */
 router.delete('/:id', authGuard, validate(idParamOnlySchema), ownRecordGuard, deleteRequestHandler);
 

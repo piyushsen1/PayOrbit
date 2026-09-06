@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate';
 import { authGuard } from '../middleware/authGuard';
 import { roleGuard } from '../middleware/roleGuard';
 import { UserRole } from '../entities/User';
-import { signupHandler, loginHandler } from '../controllers/auth.controller';
+import { signupHandler, loginHandler, getMeHandler } from '../controllers/auth.controller';
 
 const router = Router();
 
@@ -91,13 +91,11 @@ router.post('/login', validate(loginSchema), loginHandler);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: The decoded token payload.
+ *         description: The current user's account (id, email, role, status, employeeId).
  *       401:
  *         description: Missing, malformed, or invalid token.
  */
-router.get('/me', authGuard, (req: Request, res: Response) => {
-  res.success({ sub: req.user!.sub, role: req.user!.role });
-});
+router.get('/me', authGuard, getMeHandler);
 
 /**
  * @openapi

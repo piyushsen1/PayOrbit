@@ -1,3 +1,4 @@
+import { ILike } from 'typeorm';
 import { AppDataSource } from '../config/data-source';
 import { SalaryStructure } from '../entities/SalaryStructure';
 import { AppError } from '../utils/AppError';
@@ -6,8 +7,12 @@ import { parsePagination, buildPaginationMeta, type PaginationParams } from '../
 
 const salaryStructureRepository = () => AppDataSource.getRepository(SalaryStructure);
 
-export async function listSalaryStructures(pagination: PaginationParams = parsePagination({})) {
+export async function listSalaryStructures(
+  filter?: { search?: string },
+  pagination: PaginationParams = parsePagination({})
+) {
   const [structures, total] = await salaryStructureRepository().findAndCount({
+    where: filter?.search ? { name: ILike(`%${filter.search}%`) } : {},
     relations: ['rules'],
     order: { name: 'ASC' },
     skip: pagination.skip,

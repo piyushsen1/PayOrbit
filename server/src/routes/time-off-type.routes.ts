@@ -16,14 +16,18 @@ import {
 
 const router = Router();
 
-/** HR Manager and every payroll/admin role above it manage the leave policy catalog; Employee has no access. */
+/** HR Manager and every payroll/admin role above it manage the leave policy catalog. */
 const MANAGE_ROLES = [UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN];
+/** Employee gets read-only access too — needed to see the type catalog when self-filing a Time Off Request. */
+const READ_ROLES = [UserRole.EMPLOYEE, ...MANAGE_ROLES];
 /** Only these roles can ever be the designated approver for a leave type. */
 const approvalRoleEnum = z.enum([UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.HR_PAYROLL_MANAGER, UserRole.ADMIN]);
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
-const listQuerySchema = z.object({ query: z.object(paginationQuerySchema) });
+const listQuerySchema = z.object({
+  query: z.object({ search: z.string().trim().min(1).optional(), ...paginationQuerySchema }),
+});
 
 const createTimeOffTypeSchema = z.object({
   body: z.object({
@@ -60,13 +64,16 @@ const updateTimeOffTypeSchema = z.object({
  *     tags: [Time Off Types]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive partial match on type name.
  *     responses:
  *       200:
  *         description: List of time off types.
- *       403:
- *         description: Caller lacks a manage role.
  */
-router.get('/', authGuard, roleGuard(...MANAGE_ROLES), validate(listQuerySchema), listTimeOffTypesHandler);
+router.get('/', authGuard, roleGuard(...READ_ROLES), validate(listQuerySchema), listTimeOffTypesHandler);
 
 /**
  * @openapi
@@ -89,7 +96,7 @@ router.get('/', authGuard, roleGuard(...MANAGE_ROLES), validate(listQuerySchema)
  *       404:
  *         description: Not found.
  */
-router.get('/:id', authGuard, roleGuard(...MANAGE_ROLES), validate(idParamOnlySchema), getTimeOffTypeHandler);
+router.get('/:id', authGuard, roleGuard(...READ_ROLES), validate(idParamOnlySchema), getTimeOffTypeHandler);
 
 /**
  * @openapi

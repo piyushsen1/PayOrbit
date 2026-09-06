@@ -8,11 +8,13 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { Pagination, type PaginationMeta } from '@/components/ui/Pagination';
+import { CATEGORY_OPTIONS } from './SalaryRuleFormView';
 
 type Role = 'employee' | 'hr_manager' | 'hr_payroll_user' | 'hr_payroll_manager' | 'admin';
 
@@ -36,6 +38,8 @@ interface SalaryRule {
 interface ApiErrorBody {
   error: { code: string; message: string };
 }
+
+const CATEGORY_FILTER_OPTIONS = [{ value: '', label: 'All categories' }, ...CATEGORY_OPTIONS];
 
 const CATEGORY_LABELS: Record<string, string> = {
   basic: 'Basic',
@@ -82,16 +86,35 @@ function SalaryRulesPageContent() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   const canView = !!user && READ_ROLES.includes(user.role);
   const canManage = !!user && MANAGE_ROLES.includes(user.role);
+
+  // Debounce the free-text search before it drives a refetch.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Search/category are filtered server-side, so their result set (and page count) can
+  // change — land back on page 1 rather than risk showing an out-of-range empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, categoryFilter]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [rulesRes, structuresRes] = await Promise.all([
         api.get<{ data: SalaryRule[]; meta: PaginationMeta }>('/salary-rules', {
-          params: { ...(structureIdFilter ? { salaryStructureId: structureIdFilter } : {}), page },
+          params: {
+            ...(structureIdFilter ? { salaryStructureId: structureIdFilter } : {}),
+            page,
+            search: debouncedSearch || undefined,
+            category: categoryFilter || undefined,
+          },
         }),
         api.get<{ data: SalaryStructure[] }>('/salary-structures', { params: { limit: 100 } }),
       ]);
@@ -108,19 +131,13 @@ function SalaryRulesPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [structureIdFilter, showToast, page]);
+  }, [structureIdFilter, showToast, page, debouncedSearch, categoryFilter]);
 
   useEffect(() => {
     if (canView) loadData();
   }, [canView, loadData]);
 
   const structureNameById = useMemo(() => new Map(structures.map((s) => [s.id, s.name])), [structures]);
-
-  const filtered = useMemo(() => {
-    if (!search) return rules;
-    const needle = search.toLowerCase();
-    return rules.filter((r) => `${r.name} ${r.code}`.toLowerCase().includes(needle));
-  }, [rules, search]);
 
   if (authLoading) return null;
 
@@ -159,11 +176,19 @@ function SalaryRulesPageContent() {
             className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
           />
         </div>
+
+        <Select
+          options={CATEGORY_FILTER_OPTIONS}
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          aria-label="Category Filter"
+          className="w-44"
+        />
       </div>
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : filtered.length === 0 ? (
+      ) : rules.length === 0 ? (
         <EmptyState title="No salary rules yet" description="Create the first rule to get started." />
       ) : (
         <Table>
@@ -177,7 +202,7 @@ function SalaryRulesPageContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.map((r) => (
+            {rules.map((r) => (
               <TableRow key={r.id} className="cursor-pointer" onClick={() => router.push(`/salary-rules/${r.id}`)}>
                 <TableCell className="font-medium">{r.name}</TableCell>
                 <TableCell className="num">{r.code}</TableCell>

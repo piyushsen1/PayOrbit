@@ -9,6 +9,7 @@ import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -50,6 +51,12 @@ const STATUS_LABEL: Record<Attendance['status'], string> = {
   absent: 'Absent',
 };
 
+const STATUS_OPTIONS = [
+  { value: 'present', label: 'Present' },
+  { value: 'late', label: 'Late' },
+  { value: 'absent', label: 'Absent' },
+];
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -87,8 +94,19 @@ function AttendancePageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [employeeFilter, setEmployeeFilter] = useState(searchParams.get('employeeId') ?? '');
   const [todayOnly, setTodayOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
   const canAccess = !!user && ATTENDANCE_MODULE_ROLES.includes(user.role);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -96,6 +114,8 @@ function AttendancePageContent() {
       const params: Record<string, string | number> = { page };
       if (employeeFilter) params.employeeId = employeeFilter;
       if (todayOnly) params.date = todayIso();
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
 
       const [attendanceRes, employeesRes] = await Promise.all([
         api.get<{ data: Attendance[]; meta: PaginationMeta }>('/attendance', { params }),
@@ -114,7 +134,7 @@ function AttendancePageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeFilter, todayOnly, showToast, page]);
+  }, [employeeFilter, todayOnly, statusFilter, search, showToast, page]);
 
   useEffect(() => {
     if (canAccess) loadData();
@@ -141,12 +161,31 @@ function AttendancePageContent() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={() => router.push('/attendance/new')}>+ New</Button>
+        <Input
+          placeholder="Search by employee name…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-64"
+        />
         <Select
           placeholder="All employees"
           options={employees.map((e) => ({ value: e.id, label: e.fullName }))}
           value={employeeFilter}
-          onChange={(e) => setEmployeeFilter(e.target.value)}
+          onChange={(e) => {
+            setEmployeeFilter(e.target.value);
+            setPage(1);
+          }}
           className="w-56"
+        />
+        <Select
+          placeholder="All statuses"
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          className="w-44"
         />
         <Button variant={todayOnly ? 'secondary' : 'outline'} size="sm" onClick={() => setTodayOnly((prev) => !prev)}>
           Today

@@ -1,3 +1,4 @@
+import { ILike } from 'typeorm';
 import { AppDataSource } from '../config/data-source';
 import { TimeOffType, TimeOffTypeStatus, TimeOffUnit } from '../entities/TimeOffType';
 import { UserRole } from '../entities/User';
@@ -18,8 +19,12 @@ export interface TimeOffTypeInput {
   notes?: string | null;
 }
 
-export async function listTimeOffTypes(pagination: PaginationParams = parsePagination({})) {
+export async function listTimeOffTypes(
+  filter?: { search?: string },
+  pagination: PaginationParams = parsePagination({})
+) {
   const [items, total] = await timeOffTypeRepository().findAndCount({
+    where: filter?.search ? { name: ILike(`%${filter.search}%`) } : {},
     order: { name: 'ASC' },
     skip: pagination.skip,
     take: pagination.take,

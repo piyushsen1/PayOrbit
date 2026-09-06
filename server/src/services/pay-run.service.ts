@@ -46,18 +46,26 @@ async function resolveApplicableContract(employeeId: string, periodStart: string
     .where('contract.employee_id = :employeeId', { employeeId })
     .andWhere('contract.start_date <= :periodEnd', { periodEnd })
     .andWhere('(contract.end_date IS NULL OR contract.end_date >= :periodStart)', { periodStart })
-    .orderBy('contract.start_date', 'DESC')
+    .orderBy('contract.startDate', 'DESC')
     .getMany();
   return contracts[0] ?? null;
 }
 
-export async function listPayRuns(pagination: PaginationParams = parsePagination({})) {
-  const [payRuns, total] = await payRunRepository().findAndCount({
-    relations: ['payslips'],
-    order: { periodStart: 'DESC' },
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+export async function listPayRuns(
+  filter?: { search?: string; status?: PayRunStatus },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const qb = payRunRepository()
+    .createQueryBuilder('payRun')
+    .leftJoinAndSelect('payRun.payslips', 'payslips')
+    .orderBy('payRun.periodStart', 'DESC')
+    .skip(pagination.skip)
+    .take(pagination.take);
+
+  if (filter?.status) qb.andWhere('payRun.status = :status', { status: filter.status });
+  if (filter?.search) qb.andWhere('payRun.name ILIKE :search', { search: `%${filter.search}%` });
+
+  const [payRuns, total] = await qb.getManyAndCount();
   return { items: payRuns.map(withCounts), meta: buildPaginationMeta(pagination, total) };
 }
 

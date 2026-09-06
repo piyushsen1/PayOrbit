@@ -5,8 +5,10 @@ import { parsePagination } from '../utils/pagination';
 export async function listContractsHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const status = typeof req.query.status === 'string' ? (req.query.status as contractService.ContractStatus) : undefined;
     const pagination = parsePagination(req.query as { page?: number; limit?: number });
-    const { items, meta } = await contractService.listContracts({ employeeId }, pagination);
+    const { items, meta } = await contractService.listContracts({ employeeId, search, status }, pagination);
     res.success(items, 200, meta);
   } catch (err) {
     next(err);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
@@ -68,14 +68,23 @@ export default function UserManagementPage() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const formCardRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = user?.role === 'admin';
+
+  // Debounce the free-text search before it drives a refetch.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -83,7 +92,7 @@ export default function UserManagementPage() {
       const [employeesRes, usersRes] = await Promise.all([
         api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
         api.get<{ data: UserAccount[]; meta: PaginationMeta }>('/users', {
-          params: { page, role: roleFilter || undefined },
+          params: { page, role: roleFilter || undefined, search: debouncedSearch || undefined },
         }),
       ]);
       setEmployees(employeesRes.data.data);
@@ -99,22 +108,24 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, page, roleFilter]);
+  }, [showToast, page, roleFilter, debouncedSearch]);
 
   useEffect(() => {
     if (isAdmin) loadData();
   }, [isAdmin, loadData]);
 
-  // Role is filtered server-side, so its result set (and page count) can change —
-  // land back on page 1 rather than risk showing an out-of-range empty page.
+  // Role/search are filtered server-side, so their result set (and page count) can
+  // change — land back on page 1 rather than risk showing an out-of-range empty page.
   useEffect(() => {
     setPage(1);
-  }, [roleFilter]);
+  }, [roleFilter, debouncedSearch]);
 
   function startCreate() {
     setEditingId(null);
     setForm(emptyForm());
     setFormError(undefined);
+    formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast({ title: 'Ready to create a new user', description: 'Fill in the form on the right.', variant: 'neutral' });
   }
 
   function startEdit(u: UserAccount) {
@@ -167,6 +178,27 @@ export default function UserManagementPage() {
     }
   }
 
+  async function handleToggleStatus() {
+    if (!editingId) return;
+    const nextStatus: Status = form.status === 'active' ? 'inactive' : 'active';
+    setIsTogglingStatus(true);
+    try {
+      await api.patch(`/users/${editingId}`, { status: nextStatus });
+      setForm((prev) => ({ ...prev, status: nextStatus }));
+      showToast({ title: nextStatus === 'active' ? 'User activated' : 'User deactivated', variant: 'success' });
+      await loadData();
+    } catch (err) {
+      const axiosErr = err as AxiosError<ApiErrorBody>;
+      showToast({
+        title: 'Failed to update status',
+        description: getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message),
+        variant: 'danger',
+      });
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  }
+
   if (authLoading) {
     return (
       <Container className="flex flex-col gap-3 py-10">
@@ -183,13 +215,6 @@ export default function UserManagementPage() {
       </Container>
     );
   }
-
-  // Role is filtered server-side (see loadData). Search is client-side over
-  // the current page only, same as the other list pages in this app.
-  const filteredUsers = users.filter((u) => {
-    const haystack = `${u.employee?.fullName ?? ''} ${u.email}`.toLowerCase();
-    return !search || haystack.includes(search.toLowerCase());
-  });
 
   return (
     <Container className="flex flex-col gap-6 py-10">
@@ -233,7 +258,7 @@ export default function UserManagementPage() {
 
           {isLoading ? (
             <Skeleton className="h-64 w-full" />
-          ) : filteredUsers.length === 0 ? (
+          ) : users.length === 0 ? (
             <EmptyState title="No users yet" description="Create the first user account to get started." />
           ) : (
             <Table>
@@ -247,7 +272,7 @@ export default function UserManagementPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredUsers.map((u) => (
+                {users.map((u) => (
                   <TableRow
                     key={u.id}
                     onClick={() => startEdit(u)}
@@ -277,59 +302,77 @@ export default function UserManagementPage() {
           </p>
         </div>
 
-        <Card className="h-fit">
-          <CardBody className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">Create / Edit User</h2>
+        <div ref={formCardRef}>
+          <Card className="h-fit">
+            <CardBody className="flex flex-col gap-4">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Create / Edit User</h2>
 
-            <Select
-              label="Employee *"
-              placeholder="Select employee"
-              options={employees.map((e) => ({ value: e.id, label: e.fullName }))}
-              value={form.employeeId}
-              onChange={(e) => handleEmployeeChange(e.target.value)}
-            />
+              <Select
+                label="Employee *"
+                placeholder="Select employee"
+                options={employees.map((e) => ({ value: e.id, label: e.fullName }))}
+                value={form.employeeId}
+                onChange={(e) => handleEmployeeChange(e.target.value)}
+              />
 
-            <Input
-              label="Work Email *"
-              type="email"
-              placeholder="employee@company.com"
-              value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-            />
+              <Input
+                label="Work Email *"
+                type="email"
+                placeholder="employee@company.com"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              />
 
-            <RadioGroup
-              label="Roles *"
-              name="role"
-              options={ROLE_OPTIONS}
-              value={form.role}
-              onChange={(value) => setForm((prev) => ({ ...prev, role: value as Role }))}
-            />
+              <RadioGroup
+                label="Roles *"
+                name="role"
+                options={ROLE_OPTIONS}
+                value={form.role}
+                disabled={editingId === user?.id}
+                onChange={(value) => setForm((prev) => ({ ...prev, role: value as Role }))}
+              />
+              {editingId === user?.id && (
+                <p className="text-xs text-[var(--text-tertiary)]">You can't change your own role.</p>
+              )}
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                Account Status
-              </span>
-              <button
-                type="button"
-                onClick={() => setForm((prev) => ({ ...prev, status: prev.status === 'active' ? 'inactive' : 'active' }))}
-              >
-                <Badge variant={form.status === 'active' ? 'success' : 'neutral'} dot>
-                  {form.status === 'active' ? 'Active' : 'Inactive'}
-                </Badge>
-              </button>
-            </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                  Account Status
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, status: prev.status === 'active' ? 'inactive' : 'active' }))}
+                >
+                  <Badge variant={form.status === 'active' ? 'success' : 'neutral'} dot>
+                    {form.status === 'active' ? 'Active' : 'Inactive'}
+                  </Badge>
+                </button>
+              </div>
 
-            {formError && (
-              <p className="rounded-2xl bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]">
-                {formError}
-              </p>
-            )}
+              {formError && (
+                <p className="rounded-2xl bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]">
+                  {formError}
+                </p>
+              )}
 
-            <Button onClick={handleSubmit} size="lg" isLoading={isSubmitting}>
-              Create User / Save Access
-            </Button>
-          </CardBody>
-        </Card>
+              <div className="flex gap-2">
+                <Button onClick={handleSubmit} size="lg" isLoading={isSubmitting} className="flex-1">
+                  Create User / Save Access
+                </Button>
+                {editingId && (
+                  <Button
+                    variant="danger"
+                    size="lg"
+                    onClick={handleToggleStatus}
+                    isLoading={isTogglingStatus}
+                  >
+                    {form.status === 'active' ? 'Deactivate' : 'Activate'}
+                  </Button>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
       </div>
     </Container>
   );

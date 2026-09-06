@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -24,12 +25,14 @@ interface Employee {
   fullName: string;
   department: string | null;
   jobPosition: string | null;
+  status?: 'active' | 'inactive';
 }
 
 interface WorkingSchedule {
   id: string;
   name: string;
   weeklyHours: string;
+  status?: 'active' | 'inactive';
 }
 
 interface SalaryStructure {
@@ -110,48 +113,83 @@ export function ContractFormView({ mode, contractId }: ContractFormViewProps) {
   const [notFound, setNotFound] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const canAccess = !!user && CONTRACTS_MODULE_ROLES.includes(user.role);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
+      let contractData: Contract | null = null;
+
+      if (mode === 'edit' && contractId) {
+        try {
+          const { data } = await api.get<{ data: Contract }>(`/contracts/${contractId}`);
+          contractData = data.data;
+        } catch (err) {
+          const axiosErr = err as AxiosError<ApiErrorBody>;
+          if (axiosErr.response?.status === 404) {
+            setNotFound(true);
+            return;
+          }
+          throw err;
+        }
+      }
+
       const [employeesRes, schedulesRes, structuresRes] = await Promise.all([
-        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } }),
+        api.get<{ data: Employee[] }>('/employees', { params: { limit: 100, status: 'active' } }),
         api
-          .get<{ data: WorkingSchedule[] }>('/working-schedules', { params: { limit: 100 } })
+          .get<{ data: WorkingSchedule[] }>('/working-schedules', { params: { limit: 100, status: 'active' } })
           .catch(() => ({ data: { data: [] as WorkingSchedule[] } })),
         api
           .get<{ data: SalaryStructure[] }>('/salary-structures', { params: { limit: 100 } })
           .catch(() => ({ data: { data: [] as SalaryStructure[] } })),
       ]);
-      setEmployees(employeesRes.data.data);
-      setWorkingSchedules(schedulesRes.data.data);
+
+      let employeesList = employeesRes.data.data;
+      let schedules = schedulesRes.data.data;
+
+      // Preserve the contract's currently-assigned employee/working schedule
+      // even if they've since gone inactive — this select is read-only in
+      // edit mode, but it (and the page header) must still show the real
+      // assignment rather than silently dropping it from the option list.
+      const contractEmployeeId = contractData?.employeeId;
+      if (contractEmployeeId && !employeesList.some((e) => e.id === contractEmployeeId)) {
+        try {
+          const { data } = await api.get<{ data: Employee }>(`/employees/${contractEmployeeId}`);
+          employeesList = [...employeesList, data.data];
+        } catch {
+          // employee record unavailable — leave options as-is
+        }
+      }
+
+      const contractScheduleId = contractData?.workingScheduleId;
+      if (contractScheduleId && !schedules.some((s) => s.id === contractScheduleId)) {
+        try {
+          const { data } = await api.get<{ data: WorkingSchedule }>(`/working-schedules/${contractScheduleId}`);
+          schedules = [...schedules, data.data];
+        } catch {
+          // schedule record unavailable — leave options as-is
+        }
+      }
+
+      setEmployees(employeesList);
+      setWorkingSchedules(schedules);
       setSalaryStructures(structuresRes.data.data);
 
-      if (mode === 'edit' && contractId) {
-        try {
-          const { data } = await api.get<{ data: Contract }>(`/contracts/${contractId}`);
-          const c = data.data;
-          setForm({
-            employeeId: c.employeeId,
-            department: c.department ?? '',
-            jobPosition: c.jobPosition ?? '',
-            startDate: c.startDate,
-            endDate: c.endDate ?? '',
-            wagePerMonth: c.wagePerMonth,
-            workingScheduleId: c.workingScheduleId ?? '',
-            salaryStructureId: c.salaryStructureId ?? '',
-            notes: c.notes,
-          });
-        } catch (err) {
-          const axiosErr = err as AxiosError<ApiErrorBody>;
-          if (axiosErr.response?.status === 404) {
-            setNotFound(true);
-          } else {
-            throw err;
-          }
-        }
+      if (contractData) {
+        const c = contractData;
+        setForm({
+          employeeId: c.employeeId,
+          department: c.department ?? '',
+          jobPosition: c.jobPosition ?? '',
+          startDate: c.startDate,
+          endDate: c.endDate ?? '',
+          wagePerMonth: c.wagePerMonth,
+          workingScheduleId: c.workingScheduleId ?? '',
+          salaryStructureId: c.salaryStructureId ?? '',
+          notes: c.notes,
+        });
       }
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -235,6 +273,26 @@ export function ContractFormView({ mode, contractId }: ContractFormViewProps) {
     }
   }
 
+  async function handleDelete() {
+    if (!contractId) return;
+    if (!window.confirm('Delete this contract? This cannot be undone.')) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/contracts/${contractId}`);
+      showToast({ title: 'Contract deleted', variant: 'success' });
+      router.push('/contracts');
+    } catch (err) {
+      const axiosErr = err as AxiosError<ApiErrorBody>;
+      showToast({
+        title: 'Failed to delete contract',
+        description: getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message),
+        variant: 'danger',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   if (authLoading || isLoading) {
     return (
       <Container className="flex flex-col gap-3 py-10">
@@ -260,14 +318,24 @@ export function ContractFormView({ mode, contractId }: ContractFormViewProps) {
     );
   }
 
-  const employeeOptions = employees.map((e) => ({ value: e.id, label: e.fullName }));
-  const scheduleOptions = workingSchedules.map((s) => ({ value: s.id, label: `${s.name} (${s.weeklyHours}h/week)` }));
+  const employeeOptions = employees.map((e) => ({
+    value: e.id,
+    label: e.status === 'inactive' ? `${e.fullName} (Inactive)` : e.fullName,
+  }));
+  const scheduleOptions = workingSchedules.map((s) => ({
+    value: s.id,
+    label:
+      s.status === 'inactive'
+        ? `${s.name} (${s.weeklyHours}h/week) (Inactive)`
+        : `${s.name} (${s.weeklyHours}h/week)`,
+  }));
   const structureOptions = salaryStructures.filter((s) => s.active).map((s) => ({ value: s.id, label: s.name }));
   const employeeName = employees.find((e) => e.id === form.employeeId)?.fullName ?? '';
 
   return (
     <Container className="flex flex-col gap-6 py-10">
-      <div>
+      <div className="flex flex-col gap-2">
+        <BackButton href="/contracts" label="Back to Contracts" />
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
           {mode === 'create' ? 'New Contract' : `Contract / ${employeeName || '—'}`}
         </h1>
@@ -331,13 +399,22 @@ export function ContractFormView({ mode, contractId }: ContractFormViewProps) {
             </p>
           )}
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => router.push('/contracts')}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} isLoading={isSubmitting}>
-              {mode === 'create' ? 'Create Contract' : 'Save'}
-            </Button>
+          <div className="flex justify-between gap-2">
+            {mode === 'edit' ? (
+              <Button variant="danger" onClick={handleDelete} isLoading={isDeleting}>
+                Delete
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => router.push('/contracts')}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} isLoading={isSubmitting}>
+                {mode === 'create' ? 'Create Contract' : 'Save'}
+              </Button>
+            </div>
           </div>
         </CardBody>
       </Card>

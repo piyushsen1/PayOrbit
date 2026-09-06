@@ -11,7 +11,9 @@ const router = Router();
 
 const roleEnum = z.nativeEnum(UserRole);
 const statusEnum = z.nativeEnum(UserStatus);
-const listQuerySchema = z.object({ query: z.object({ role: roleEnum.optional(), ...paginationQuerySchema }) });
+const listQuerySchema = z.object({
+  query: z.object({ role: roleEnum.optional(), search: z.string().trim().min(1).optional(), ...paginationQuerySchema }),
+});
 
 const createUserSchema = z.object({
   body: z.object({
@@ -46,6 +48,10 @@ const updateUserSchema = z.object({
  *         schema:
  *           type: string
  *           enum: [employee, hr_manager, hr_payroll_user, hr_payroll_manager, admin]
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive partial match on the linked employee's full name or the user's email.
  *     responses:
  *       200:
  *         description: List of user accounts.
@@ -118,6 +124,8 @@ router.post('/', authGuard, roleGuard(UserRole.ADMIN), validate(createUserSchema
  *         description: Caller is not an admin.
  *       404:
  *         description: User or selected employee not found.
+ *       422:
+ *         description: Caller attempted to change their own role.
  */
 router.patch('/:id', authGuard, roleGuard(UserRole.ADMIN), validate(updateUserSchema), updateUserHandler);
 

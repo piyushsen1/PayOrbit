@@ -30,10 +30,9 @@ const EMPLOYEE_TYPE_OPTIONS: { value: EmployeeType; label: string }[] = [
   { value: 'intern', label: 'Intern' },
 ];
 
-interface Employee {
-  id: string;
-  department: string | null;
-  company: string | null;
+interface FilterOptions {
+  departments: string[];
+  companies: string[];
 }
 
 interface DashboardData {
@@ -88,7 +87,7 @@ export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { showToast } = useToast();
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ departments: [], companies: [] });
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
   const [department, setDepartment] = useState('');
@@ -99,10 +98,10 @@ export default function DashboardPage() {
 
   const canAccess = !!user && DASHBOARD_ROLES.includes(user.role);
 
-  const loadEmployees = useCallback(async () => {
+  const loadFilterOptions = useCallback(async () => {
     try {
-      const { data } = await api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } });
-      setEmployees(data.data);
+      const { data } = await api.get<{ data: FilterOptions }>('/employees/filter-options');
+      setFilterOptions(data.data);
     } catch {
       // Filter options are a convenience; a failed fetch just leaves them empty.
     }
@@ -135,21 +134,21 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (canAccess) {
-      loadEmployees();
+      loadFilterOptions();
       loadDashboard();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess]);
 
-  const departmentOptions = useMemo(() => {
-    const set = new Set(employees.map((e) => e.department).filter((d): d is string => !!d));
-    return Array.from(set).map((d) => ({ value: d, label: d }));
-  }, [employees]);
+  const departmentOptions = useMemo(
+    () => filterOptions.departments.map((d) => ({ value: d, label: d })),
+    [filterOptions.departments],
+  );
 
-  const companyOptions = useMemo(() => {
-    const set = new Set(employees.map((e) => e.company).filter((c): c is string => !!c));
-    return Array.from(set).map((c) => ({ value: c, label: c }));
-  }, [employees]);
+  const companyOptions = useMemo(
+    () => filterOptions.companies.map((c) => ({ value: c, label: c })),
+    [filterOptions.companies],
+  );
 
   if (authLoading) return null;
 

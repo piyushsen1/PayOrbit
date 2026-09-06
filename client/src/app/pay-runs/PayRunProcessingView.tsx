@@ -10,6 +10,7 @@ import { downloadFile } from '@/lib/downloadFile';
 import { WARNING_TYPE_LABELS } from '@/lib/payslipWarnings';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table';
@@ -186,7 +187,8 @@ export function PayRunProcessingView({ payRunId }: { payRunId: string }) {
   return (
     <Container className="flex flex-col gap-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="flex flex-col gap-2">
+          <BackButton href="/pay-runs" label="Back to Pay Runs" />
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">{payRun.name}</h1>
           <p className="text-xs text-[var(--text-tertiary)]">
             {payRun.salaryStructure?.name ?? '—'} • {payRun.periodStart} → {payRun.periodEnd}

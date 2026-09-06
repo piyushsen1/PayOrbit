@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { AxiosError } from 'axios';
-import { z } from 'zod';
-import { useAuth } from '@/hooks/useAuth';
-import { Container } from '@/components/layout/Container';
-import { Card, CardBody } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { useToast } from '@/components/ui/Toast';
-import { getErrorMessage } from '@/lib/errorMessages';
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { AxiosError } from "axios";
+import { z } from "zod";
+import { useAuth } from "@/hooks/useAuth";
+import { Container } from "@/components/layout/Container";
+import { Card, CardBody } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
+import { getErrorMessage } from "@/lib/errorMessages";
 
 const credentialsSchema = z.object({
-  email: z.string().email('Enter a valid email address.'),
-  password: z.string().min(1, 'Password is required.'),
+  email: z.string().email("Enter a valid email address."),
+  password: z.string().min(1, "Password is required."),
 });
 
 interface ApiErrorBody {
@@ -26,8 +26,8 @@ export default function LoginPage() {
   const router = useRouter();
   const { showToast } = useToast();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,10 +46,15 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(parsed.data.email, parsed.data.password);
-      router.push('/');
+      router.push("/");
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
-      setFormError(getErrorMessage(axiosErr.response?.data?.error?.code, axiosErr.response?.data?.error?.message));
+      setFormError(
+        getErrorMessage(
+          axiosErr.response?.data?.error?.code,
+          axiosErr.response?.data?.error?.message,
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -64,8 +69,12 @@ export default function LoginPage() {
           </span>
 
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Welcome back</h1>
-            <p className="text-sm text-[var(--text-secondary)]">Sign in to continue to your workspace.</p>
+            <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
+              Welcome back
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Sign in to continue to your workspace.
+            </p>
           </div>
 
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
@@ -85,13 +94,13 @@ export default function LoginPage() {
                 error={fieldError}
                 autoComplete="current-password"
               />
-              <button
+              {/* <button
                 type="button"
                 onClick={() => showToast({ title: 'Not available yet', description: 'Password reset is a planned enhancement.', variant: 'neutral' })}
                 className="self-end text-sm font-semibold text-[var(--text-link)] hover:text-[var(--primary-hover)] hover:underline"
               >
                 Forgot password?
-              </button>
+              </button> */}
             </div>
             {formError && (
               <p className="rounded-2xl bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]">
@@ -104,9 +113,12 @@ export default function LoginPage() {
           </form>
 
           <div className="flex flex-col gap-1 border-t border-[var(--border-subtle)] pt-4 text-center">
-            <p className="text-xs text-[var(--text-tertiary)]">Accounts are created by an administrator.</p>
             <p className="text-xs text-[var(--text-tertiary)]">
-              After sign-in, only the modules and actions allowed by your assigned role are shown.
+              Accounts are created by an administrator.
+            </p>
+            <p className="text-xs text-[var(--text-tertiary)]">
+              After sign-in, only the modules and actions allowed by your
+              assigned role are shown.
             </p>
           </div>
         </CardBody>

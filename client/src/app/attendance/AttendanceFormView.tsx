@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errorMessages';
 import { Container } from '@/components/layout/Container';
 import { Card, CardBody } from '@/components/ui/Card';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -31,6 +32,7 @@ interface Employee {
   fullName: string;
   department: string | null;
   managerId: string | null;
+  status: 'active' | 'inactive';
 }
 
 interface Attendance {
@@ -91,8 +93,10 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const employeesRes = await api.get<{ data: Employee[] }>('/employees', { params: { limit: 100 } });
-      setEmployees(employeesRes.data.data);
+      const employeesRes = await api.get<{ data: Employee[] }>('/employees', {
+        params: { limit: 100, status: 'active' },
+      });
+      let employees = employeesRes.data.data;
 
       if (mode === 'edit' && attendanceId) {
         try {
@@ -106,6 +110,18 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
           setNotes(a.notes ?? '');
           setWorkedHours(a.workedHours);
           setOvertime(a.overtime);
+
+          // Keep the assigned employee in the picker even if they've since
+          // gone inactive, so editing doesn't look like the assignment was
+          // silently wiped (or risk clearing it on save).
+          if (a.employeeId && !employees.some((e) => e.id === a.employeeId)) {
+            try {
+              const { data: empData } = await api.get<{ data: Employee }>(`/employees/${a.employeeId}`);
+              employees = [...employees, empData.data];
+            } catch {
+              // employee record unavailable — leave options as-is
+            }
+          }
         } catch (err) {
           const axiosErr = err as AxiosError<ApiErrorBody>;
           if (axiosErr.response?.status === 404) {
@@ -115,6 +131,8 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
           }
         }
       }
+
+      setEmployees(employees);
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       showToast({
@@ -220,11 +238,15 @@ export function AttendanceFormView({ mode, attendanceId }: AttendanceFormViewPro
 
   const selectedEmployee = employees.find((e) => e.id === employeeId);
   const managerName = employees.find((e) => e.id === selectedEmployee?.managerId)?.fullName ?? '—';
-  const employeeOptions = employees.map((e) => ({ value: e.id, label: e.fullName }));
+  const employeeOptions = employees.map((e) => ({
+    value: e.id,
+    label: e.status === 'inactive' ? `${e.fullName} (Inactive)` : e.fullName,
+  }));
 
   return (
     <Container className="flex flex-col gap-6 py-10">
-      <div>
+      <div className="flex flex-col gap-2">
+        <BackButton href="/attendance" label="Back to Attendance" />
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
           {mode === 'create' ? 'New Attendance Record' : `Attendance / ${selectedEmployee?.fullName ?? '—'}`}
         </h1>

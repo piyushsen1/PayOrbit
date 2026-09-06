@@ -1,3 +1,4 @@
+import { ILike } from 'typeorm';
 import { AppDataSource } from '../config/data-source';
 import { Employee, EmployeeStatus, EmployeeType } from '../entities/Employee';
 import { WorkingSchedule } from '../entities/WorkingSchedule';
@@ -7,6 +8,8 @@ import { parsePagination, buildPaginationMeta, type PaginationParams } from '../
 
 const employeeRepository = () => AppDataSource.getRepository(Employee);
 const workingScheduleRepository = () => AppDataSource.getRepository(WorkingSchedule);
+
+export type EmployeeStatusFilter = EmployeeStatus;
 
 export interface EmployeeInput {
   fullName: string;
@@ -42,8 +45,16 @@ async function assertWorkingScheduleExists(workingScheduleId: string) {
   }
 }
 
-export async function listEmployees(pagination: PaginationParams = parsePagination({})) {
+export async function listEmployees(
+  filter?: { search?: string; status?: EmployeeStatus },
+  pagination: PaginationParams = parsePagination({})
+) {
+  const where: Record<string, unknown> = {};
+  if (filter?.search) where.fullName = ILike(`%${filter.search}%`);
+  if (filter?.status) where.status = filter.status;
+
   const [items, total] = await employeeRepository().findAndCount({
+    where,
     order: { fullName: 'ASC' },
     skip: pagination.skip,
     take: pagination.take,
@@ -129,4 +140,31 @@ export async function deleteEmployee(id: string) {
   if (!result.affected) {
     throw new AppError(ErrorCodes.NOT_FOUND, 'Employee not found.', 404);
   }
+}
+
+/**
+ * Distinct, non-null department/company values across all employees — feeds the
+ * Payroll Dashboard's filter dropdowns (not a paginated table, so no pagination here).
+ */
+export async function getEmployeeFilterOptions() {
+  const repo = employeeRepository();
+
+  const departmentRows = await repo
+    .createQueryBuilder('employee')
+    .select('DISTINCT employee.department', 'department')
+    .where('employee.department IS NOT NULL')
+    .orderBy('employee.department', 'ASC')
+    .getRawMany<{ department: string }>();
+
+  const companyRows = await repo
+    .createQueryBuilder('employee')
+    .select('DISTINCT employee.company', 'company')
+    .where('employee.company IS NOT NULL')
+    .orderBy('employee.company', 'ASC')
+    .getRawMany<{ company: string }>();
+
+  return {
+    departments: departmentRows.map((row) => row.department),
+    companies: companyRows.map((row) => row.company),
+  };
 }

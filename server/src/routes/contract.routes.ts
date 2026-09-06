@@ -22,7 +22,12 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 const idParamOnlySchema = z.object({ params: idParamSchema });
 
 const listQuerySchema = z.object({
-  query: z.object({ employeeId: z.string().uuid().optional(), ...paginationQuerySchema }),
+  query: z.object({
+    employeeId: z.string().uuid().optional(),
+    search: z.string().trim().min(1).optional(),
+    status: z.enum(['running', 'expired']).optional(),
+    ...paginationQuerySchema,
+  }),
 });
 
 const createContractSchema = z.object({
@@ -63,6 +68,13 @@ const updateContractSchema = z.object({
  *         schema:
  *           type: string
  *           format: uuid
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive partial match on the linked employee's full name.
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [running, expired] }
  *     responses:
  *       200:
  *         description: List of contracts.

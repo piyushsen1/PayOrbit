@@ -32,16 +32,22 @@ async function resolveAllocation(employeeId: string, timeOffTypeId: string, dura
 }
 
 export async function listRequests(
-  filter?: { employeeId?: string },
+  filter?: { employeeId?: string; status?: TimeOffRequestStatus; search?: string },
   pagination: PaginationParams = parsePagination({})
 ) {
-  const [items, total] = await requestRepository().findAndCount({
-    where: filter?.employeeId ? { employeeId: filter.employeeId } : {},
-    relations: ['employee', 'timeOffType'],
-    order: { createdAt: 'DESC' },
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+  const qb = requestRepository()
+    .createQueryBuilder('request')
+    .leftJoinAndSelect('request.employee', 'employee')
+    .leftJoinAndSelect('request.timeOffType', 'timeOffType')
+    .orderBy('request.createdAt', 'DESC')
+    .skip(pagination.skip)
+    .take(pagination.take);
+
+  if (filter?.employeeId) qb.andWhere('request.employee_id = :employeeId', { employeeId: filter.employeeId });
+  if (filter?.status) qb.andWhere('request.status = :status', { status: filter.status });
+  if (filter?.search) qb.andWhere('employee.full_name ILIKE :search', { search: `%${filter.search}%` });
+
+  const [items, total] = await qb.getManyAndCount();
   return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
@@ -128,8 +134,12 @@ export async function updateRequest(id: string, input: Partial<Omit<TimeOffReque
 
 export async function deleteRequest(id: string) {
   const repo = requestRepository();
-  const result = await repo.delete(id);
-  if (!result.affected) throw new AppError(ErrorCodes.NOT_FOUND, 'Time off request not found.', 404);
+  const request = await repo.findOne({ where: { id } });
+  if (!request) throw new AppError(ErrorCodes.NOT_FOUND, 'Time off request not found.', 404);
+  if (request.status !== TimeOffRequestStatus.PENDING) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Only pending requests can be cancelled.', 422);
+  }
+  await repo.delete(id);
 }
 
 async function setRequestDecision(id: string, status: TimeOffRequestStatus, approverId: string) {

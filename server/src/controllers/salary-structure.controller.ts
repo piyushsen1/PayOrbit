@@ -4,8 +4,9 @@ import { parsePagination } from '../utils/pagination';
 
 export async function listSalaryStructuresHandler(req: Request, res: Response, next: NextFunction) {
   try {
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const pagination = parsePagination(req.query as { page?: number; limit?: number });
-    const { items, meta } = await salaryStructureService.listSalaryStructures(pagination);
+    const { items, meta } = await salaryStructureService.listSalaryStructures({ search }, pagination);
     res.success(items, 200, meta);
   } catch (err) {
     next(err);

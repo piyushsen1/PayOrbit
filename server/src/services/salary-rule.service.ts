@@ -1,3 +1,4 @@
+import { ILike } from 'typeorm';
 import { AppDataSource } from '../config/data-source';
 import { SalaryRule, SalaryRuleCategory, SalaryRuleComputationMethod } from '../entities/SalaryRule';
 import { SalaryStructure } from '../entities/SalaryStructure';
@@ -7,6 +8,8 @@ import { parsePagination, buildPaginationMeta, type PaginationParams } from '../
 
 const salaryRuleRepository = () => AppDataSource.getRepository(SalaryRule);
 const salaryStructureRepository = () => AppDataSource.getRepository(SalaryStructure);
+
+export type SalaryRuleCategoryFilter = SalaryRuleCategory;
 
 export interface SalaryRuleInput {
   name: string;
@@ -33,11 +36,16 @@ function assertComputationInputValid(computationMethod: SalaryRuleComputationMet
 }
 
 export async function listSalaryRules(
-  filter?: { salaryStructureId?: string },
+  filter?: { salaryStructureId?: string; search?: string; category?: SalaryRuleCategory },
   pagination: PaginationParams = parsePagination({})
 ) {
+  const where: Record<string, unknown> = {};
+  if (filter?.salaryStructureId) where.salaryStructureId = filter.salaryStructureId;
+  if (filter?.search) where.name = ILike(`%${filter.search}%`);
+  if (filter?.category) where.category = filter.category;
+
   const [items, total] = await salaryRuleRepository().findAndCount({
-    where: filter?.salaryStructureId ? { salaryStructureId: filter.salaryStructureId } : {},
+    where,
     order: { sequence: 'ASC' },
     skip: pagination.skip,
     take: pagination.take,

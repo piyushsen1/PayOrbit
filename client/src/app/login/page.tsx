@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AxiosError } from "axios";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
+import { getLandingRoute } from "@/lib/landingRoutes";
 import { Container } from "@/components/layout/Container";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -22,7 +23,7 @@ interface ApiErrorBody {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { user, isLoading, login } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -31,6 +32,15 @@ export default function LoginPage() {
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // An already-authenticated session (e.g. a second tab, back button, or a
+  // bookmark) shouldn't be able to sit on the login form with the real nav
+  // rendered above it — bounce straight to the role's landing page.
+  useEffect(() => {
+    if (!isLoading && user) {
+      router.replace(getLandingRoute(user.role));
+    }
+  }, [isLoading, user, router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -45,8 +55,10 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      await login(parsed.data.email, parsed.data.password);
-      router.push("/");
+      const user = await login(parsed.data.email, parsed.data.password);
+      // Straight to the role's landing page — no intermediate hop through `/`
+      // (which would otherwise mount, render a skeleton, then redirect again).
+      router.push(getLandingRoute(user.role));
     } catch (err) {
       const axiosErr = err as AxiosError<ApiErrorBody>;
       setFormError(

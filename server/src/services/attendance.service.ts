@@ -240,9 +240,6 @@ export async function checkIn(employeeId: string) {
   if (record?.checkIn && !record.checkOut) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Already checked in for today.', 422);
   }
-  if (record?.checkOut) {
-    throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Already checked out for today.', 422);
-  }
 
   if (!record) {
     record = repo.create({ employeeId, date });
@@ -251,7 +248,11 @@ export async function checkIn(employeeId: string) {
   const checkInTime = new Date();
   const scheduleDay = await getScheduledDay(employee, date);
 
+  // Re-opening the day (already checked out once) starts a new check-in/out
+  // cycle on the same row — only the latest cycle's times are kept, not a
+  // history of every session that day.
   record.checkIn = checkInTime;
+  record.checkOut = null;
   record.status = scheduleDay && isLateCheckIn(checkInTime, scheduleDay) ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
   const saved = await repo.save(record);
 

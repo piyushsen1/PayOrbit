@@ -89,6 +89,7 @@ export function AttendanceWidget() {
       } else {
         const { data } = await api.post<{ data: AttendanceRecord }>('/attendance/check-in');
         setCheckInTime(data.data.checkIn ? new Date(data.data.checkIn) : new Date());
+        setCompletedToday(false);
         showToast({ title: 'Checked in', variant: 'success' });
       }
     } catch (err) {
@@ -116,13 +117,12 @@ export function AttendanceWidget() {
         aria-hidden="true"
       />
       {checkInTime && <span className="text-xs text-[var(--text-tertiary)]">{elapsedLabel}</span>}
-      {completedToday ? (
-        <span className="text-xs text-[var(--text-tertiary)]">Checked out for today</span>
-      ) : (
-        <Button variant="outline" size="sm" onClick={handleClick} isLoading={isSubmitting}>
-          {checkInTime ? 'Check Out' : 'Check In'}
-        </Button>
+      {!checkInTime && completedToday && (
+        <span className="text-xs text-[var(--text-tertiary)]">Checked out earlier</span>
       )}
+      <Button variant="outline" size="sm" onClick={handleClick} isLoading={isSubmitting}>
+        {checkInTime ? 'Check Out' : 'Check In'}
+      </Button>
     </div>
   );
 }

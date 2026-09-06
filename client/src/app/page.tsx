@@ -3,18 +3,15 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { getLandingRoute } from '@/lib/landingRoutes';
 import { Container } from '@/components/layout/Container';
 import { Skeleton } from '@/components/ui/Skeleton';
 
-/** Where each role lands after sign-in — its most central screen. */
-const LANDING_ROUTE_BY_ROLE: Record<string, string> = {
-  admin: '/users',
-  hr_payroll_manager: '/dashboard',
-  hr_payroll_user: '/dashboard',
-  hr_manager: '/employees',
-  employee: '/time-off-requests',
-};
-
+/**
+ * Only reached by a direct visit to `/` while already signed in (e.g. the
+ * logo link) — login itself navigates straight to the landing route and
+ * never passes through here, avoiding a redundant hop.
+ */
 export default function HomePage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
@@ -25,7 +22,7 @@ export default function HomePage() {
       router.replace('/login');
       return;
     }
-    router.replace(LANDING_ROUTE_BY_ROLE[user.role] ?? '/time-off-requests');
+    router.replace(getLandingRoute(user.role));
   }, [isLoading, user, router]);
 
   return (

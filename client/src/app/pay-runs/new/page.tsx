@@ -209,7 +209,13 @@ export default function NewPayRunPage() {
       {step === 1 ? (
         <Card>
           <CardBody className="flex flex-col gap-4">
-            <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              label="Name *"
+              placeholder="e.g. August 2026 Payroll"
+              hint="Just a label for this payroll batch — who's included is chosen on the next step."
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
             <Select
               label="Salary Structure *"
               placeholder="Select salary structure"

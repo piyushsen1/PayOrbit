@@ -44,7 +44,7 @@ export function Header() {
           PayOrbit
         </Link>
 
-        {!isLoading && user && (
+        {!isLoading && user && pathname !== '/login' && (
           <>
             <nav className="flex shrink-0 items-center gap-1">
               {hasHrAccess && (

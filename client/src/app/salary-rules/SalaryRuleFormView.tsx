@@ -275,7 +275,12 @@ export function SalaryRuleFormView({ mode, ruleId, initialStructureId }: SalaryR
             />
             {(computationMethod === 'fixed' || computationMethod === 'percentage') && (
               <Input
-                label={computationMethod === 'fixed' ? 'Amount' : 'Percentage of Wage'}
+                label={computationMethod === 'fixed' ? 'Amount (monthly)' : '% of Monthly Wage'}
+                hint={
+                  computationMethod === 'fixed'
+                    ? 'A flat monthly figure — applied as-is regardless of the pay run period length.'
+                    : "A percentage of the employee's contracted monthly wage."
+                }
                 type="number"
                 value={value}
                 disabled={readOnly}

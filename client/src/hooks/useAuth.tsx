@@ -16,7 +16,7 @@ export interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => void;
 }
 
@@ -55,6 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await api.post<LoginResponse>('/auth/login', { email, password });
     setStoredToken(data.data.token);
     setUser(data.data.user);
+    // Returned directly (not read back via context) so the caller can navigate
+    // straight to the right landing route without waiting on a re-render.
+    return data.data.user;
   }, []);
 
   const logout = useCallback(() => {

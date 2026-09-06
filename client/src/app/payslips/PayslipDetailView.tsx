@@ -219,6 +219,22 @@ export function PayslipDetailView({ payslipId }: { payslipId: string }) {
             </div>
           </div>
 
+          {payslip.basic === null && payslip.status === 'draft' && (
+            <div className="flex flex-col gap-2 rounded-2xl bg-[var(--surface-sunken)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+              <p>
+                Not computed yet — the figures below will stay blank until this payslip&apos;s pay run is computed.{' '}
+                <button
+                  type="button"
+                  onClick={() => payslip.payRun && router.push(`/pay-runs/${payslip.payRun.id}`)}
+                  className="font-semibold text-[var(--text-link)] hover:underline"
+                >
+                  Go to the pay run
+                </button>{' '}
+                and click Compute.
+              </p>
+            </div>
+          )}
+
           {payslip.warning && (
             <div className="flex flex-col gap-2 rounded-2xl bg-[var(--status-warning-bg)] px-4 py-3 text-sm text-[var(--status-warning-fg)]">
               {payslip.warningTypes && payslip.warningTypes.length > 0 && (

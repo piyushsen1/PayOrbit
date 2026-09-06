@@ -139,8 +139,14 @@ function toFormState(employee: Employee): FormState {
   };
 }
 
-const PHONE_REGEX = /^\+?[0-9()\-\s]{7,20}$/;
-const BANK_ACCOUNT_REGEX = /^[0-9]{6,20}$/;
+const PHONE_REGEX = /^[0-9]{10}$/;
+const BANK_ACCOUNT_REGEX = /^[0-9]{9,18}$/;
+const NAME_HAS_LETTER_REGEX = /[^\d\s]/;
+
+/** 10-digit numbers only for now — no country code or formatting characters. */
+function isValidPhone(value: string): boolean {
+  return PHONE_REGEX.test(value);
+}
 
 const PRIVATE_TAB_FIELDS = new Set<keyof FormState>([
   "personalEmail",
@@ -168,22 +174,29 @@ const employeeSchema = z
     workEmail: z.string().trim().email("Enter a valid work email address."),
     personalEmail: z.string(),
     phone: z.string(),
+    emergencyContactName: z.string(),
     emergencyContactPhone: z.string(),
     dateOfBirth: z.string(),
     bankAccountNumber: z.string(),
   })
   .superRefine((data, ctx) => {
+    if (!NAME_HAS_LETTER_REGEX.test(data.fullName)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fullName"], message: "Full name can't be only numbers." });
+    }
     if (data.personalEmail && !z.string().email().safeParse(data.personalEmail).success) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["personalEmail"], message: "Enter a valid personal email address." });
     }
-    if (data.phone && !PHONE_REGEX.test(data.phone)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Enter a valid phone number." });
+    if (data.phone && !isValidPhone(data.phone)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Enter a valid 10-digit phone number." });
     }
-    if (data.emergencyContactPhone && !PHONE_REGEX.test(data.emergencyContactPhone)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["emergencyContactPhone"], message: "Enter a valid phone number." });
+    if (data.emergencyContactName && !NAME_HAS_LETTER_REGEX.test(data.emergencyContactName)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["emergencyContactName"], message: "Name can't be only numbers." });
+    }
+    if (data.emergencyContactPhone && !isValidPhone(data.emergencyContactPhone)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["emergencyContactPhone"], message: "Enter a valid 10-digit phone number." });
     }
     if (data.bankAccountNumber && !BANK_ACCOUNT_REGEX.test(data.bankAccountNumber)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankAccountNumber"], message: "Bank account number must be 6-20 digits." });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankAccountNumber"], message: "Bank account number must be 9-18 digits." });
     }
     if (data.dateOfBirth) {
       const parsed = new Date(data.dateOfBirth);
@@ -191,8 +204,13 @@ const employeeSchema = z
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Enter a valid date of birth." });
       } else if (parsed.getTime() > Date.now()) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Date of birth cannot be in the future." });
-      } else if (calculateAge(data.dateOfBirth) < 15) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Employee must be at least 15 years old." });
+      } else {
+        const age = calculateAge(data.dateOfBirth);
+        if (age < 15) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Employee must be at least 15 years old." });
+        } else if (age > 100) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"], message: "Enter a realistic date of birth." });
+        }
       }
     }
   });
@@ -739,7 +757,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   value={form.phone}
                   disabled={readOnly}
                   error={fieldErrors.phone}
-                  hint={fieldErrors.phone ? undefined : "Digits only, optionally with +, spaces, dashes, or parentheses."}
+                  hint={fieldErrors.phone ? undefined : "Exactly 10 digits, no spaces or symbols."}
                   onChange={(e) => setField("phone", e.target.value)}
                 />
                 <Input
@@ -760,6 +778,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   label="Emergency Contact Name"
                   value={form.emergencyContactName}
                   disabled={readOnly}
+                  error={fieldErrors.emergencyContactName}
                   onChange={(e) =>
                     setField("emergencyContactName", e.target.value)
                   }
@@ -781,7 +800,7 @@ export function EmployeeFormView({ mode, employeeId }: EmployeeFormViewProps) {
                   hint={
                     fieldErrors.bankAccountNumber
                       ? undefined
-                      : "Required for payroll — a missing value surfaces as a pay-run warning. Digits only, 6-20 characters."
+                      : "Required for payroll — a missing value surfaces as a pay-run warning. Digits only, 9-18 characters."
                   }
                   onChange={(e) =>
                     setField("bankAccountNumber", e.target.value)

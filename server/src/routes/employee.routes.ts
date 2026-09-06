@@ -33,35 +33,57 @@ const listQuerySchema = z.object({
   }),
 });
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+const NAME_HAS_LETTER_REGEX = /[^\d\s]/;
+
+/** 10-digit numbers only for now — no country code or formatting characters. */
+function isValidPhone(value: string): boolean {
+  return PHONE_REGEX.test(value);
+}
+
+function calculateAge(dob: string): number {
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 const phoneSchema = z
   .string()
-  .regex(/^\+?[0-9()\-\s]{7,20}$/, 'Enter a valid phone number.')
+  .refine(isValidPhone, 'Enter a valid 10-digit phone number.')
   .nullable()
   .optional();
 
 const bankAccountSchema = z
   .string()
-  .regex(/^[0-9]{6,20}$/, 'Bank account number must be 6-20 digits.')
+  .regex(/^[0-9]{9,18}$/, 'Bank account number must be 9-18 digits.')
   .nullable()
   .optional();
+
+const nameSchema = (label: string) =>
+  z
+    .string()
+    .min(1, `${label} is required.`)
+    .refine((v) => NAME_HAS_LETTER_REGEX.test(v), `${label} can't be only numbers.`);
 
 const dateOfBirthSchema = z
   .string()
   .date()
   .refine((dob) => new Date(dob) <= new Date(), 'Date of birth cannot be in the future.')
-  .refine((dob) => {
-    const birth = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
-    return age >= 15;
-  }, 'Employee must be at least 15 years old.')
+  .refine((dob) => calculateAge(dob) >= 15, 'Employee must be at least 15 years old.')
+  .refine((dob) => calculateAge(dob) <= 100, 'Enter a realistic date of birth.')
   .nullable()
   .optional();
 
 const employeeBodyBase = {
-  fullName: z.string().trim().min(1, 'Full name is required.').max(100, 'Full name must be under 100 characters.'),
+  fullName: z
+    .string()
+    .trim()
+    .min(1, 'Full name is required.')
+    .max(100, 'Full name must be under 100 characters.')
+    .refine((v) => NAME_HAS_LETTER_REGEX.test(v), "Full name can't be only numbers."),
   workEmail: z.string().trim().email('Enter a valid work email.'),
   jobPosition: z.string().min(1).nullable().optional(),
   department: z.string().min(1).nullable().optional(),
@@ -75,7 +97,7 @@ const employeeBodyBase = {
   personalEmail: z.string().trim().email('Enter a valid personal email.').nullable().optional(),
   homeAddress: z.string().min(1).nullable().optional(),
   dateOfBirth: dateOfBirthSchema,
-  emergencyContactName: z.string().min(1).nullable().optional(),
+  emergencyContactName: nameSchema('Emergency contact name').nullable().optional(),
   emergencyContactPhone: phoneSchema,
   bankAccountNumber: bankAccountSchema,
 };

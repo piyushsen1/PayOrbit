@@ -1,3 +1,4 @@
+import { In } from 'typeorm';
 import { AppDataSource } from '../config/data-source';
 import { Attendance, AttendanceStatus } from '../entities/Attendance';
 import { Employee } from '../entities/Employee';
@@ -40,15 +41,16 @@ async function getScheduledDay(employee: Employee | null | undefined, date: stri
   });
 }
 
-/** Worked hours from check-in/out, and overtime against the employee's Working Schedule for that day — both derived, never stored. */
-async function withWorkedHoursAndOvertime(attendance: Attendance, employee?: Employee | null) {
+function computeWorkedHoursAndOvertime(
+  attendance: Attendance,
+  scheduleDay: WorkingScheduleDay | null | undefined
+) {
   let workedHours = 0;
   if (attendance.checkIn && attendance.checkOut) {
     workedHours = (attendance.checkOut.getTime() - attendance.checkIn.getTime()) / 3_600_000;
   }
 
   let expectedHours: number | null = null;
-  const scheduleDay = await getScheduledDay(employee, attendance.date);
   if (scheduleDay) {
     const [startH, startM] = scheduleDay.startTime.split(':').map(Number);
     const [endH, endM] = scheduleDay.endTime.split(':').map(Number);
@@ -62,6 +64,48 @@ async function withWorkedHoursAndOvertime(attendance: Attendance, employee?: Emp
     workedHours: Number(workedHours.toFixed(2)),
     overtime: Number(overtime.toFixed(2)),
   };
+}
+
+/** Worked hours from check-in/out, and overtime against the employee's Working Schedule for that day — both derived, never stored. Single-record path: one extra query, fine. */
+async function withWorkedHoursAndOvertime(attendance: Attendance, employee?: Employee | null) {
+  const scheduleDay = await getScheduledDay(employee, attendance.date);
+  return computeWorkedHoursAndOvertime(attendance, scheduleDay);
+}
+
+/** Key for the batch schedule-day map: one working schedule can have at most one row per weekday. */
+function scheduleDayKey(workingScheduleId: string, dayOfWeek: DayOfWeek): string {
+  return `${workingScheduleId}:${dayOfWeek}`;
+}
+
+/**
+ * Batch path for lists/rollups: one query for every distinct working schedule
+ * involved (not one per attendance row), avoiding the N+1 that a per-row
+ * `getScheduledDay` call would cause.
+ */
+async function buildScheduleDayMap(employees: Array<Employee | null | undefined>) {
+  const scheduleIds = Array.from(
+    new Set(employees.map((e) => e?.workingScheduleId).filter((id): id is string => !!id))
+  );
+  const map = new Map<string, WorkingScheduleDay>();
+  if (scheduleIds.length === 0) return map;
+
+  const days = await workingScheduleDayRepository().find({ where: { workingScheduleId: In(scheduleIds) } });
+  for (const day of days) {
+    map.set(scheduleDayKey(day.workingScheduleId, day.dayOfWeek), day);
+  }
+  return map;
+}
+
+function withWorkedHoursAndOvertimeBatch(
+  attendance: Attendance,
+  employee: Employee | null | undefined,
+  scheduleMap: Map<string, WorkingScheduleDay>
+) {
+  const workingScheduleId = employee?.workingScheduleId;
+  const scheduleDay = workingScheduleId
+    ? scheduleMap.get(scheduleDayKey(workingScheduleId, dayOfWeekFor(attendance.date)))
+    : undefined;
+  return computeWorkedHoursAndOvertime(attendance, scheduleDay);
 }
 
 /** True if `checkInTime` is more than LATE_GRACE_MINUTES after the scheduled start for that day (UTC time-of-day compare). */
@@ -93,7 +137,8 @@ export async function getOvertimeRollup(filter: { periodStart: string; periodEnd
   qb.leftJoinAndSelect('attendance.employee', 'employee');
 
   const records = await qb.getMany();
-  const withOvertime = await Promise.all(records.map((r) => withWorkedHoursAndOvertime(r, r.employee)));
+  const scheduleMap = await buildScheduleDayMap(records.map((r) => r.employee));
+  const withOvertime = records.map((r) => withWorkedHoursAndOvertimeBatch(r, r.employee, scheduleMap));
 
   return {
     present: records.filter((r) => r.status === AttendanceStatus.PRESENT).length,
@@ -121,7 +166,8 @@ export async function listAttendance(
   if (filter?.search) qb.andWhere('employee.full_name ILIKE :search', { search: `%${filter.search}%` });
 
   const [records, total] = await qb.getManyAndCount();
-  const items = await Promise.all(records.map((r) => withWorkedHoursAndOvertime(r, r.employee)));
+  const scheduleMap = await buildScheduleDayMap(records.map((r) => r.employee));
+  const items = records.map((r) => withWorkedHoursAndOvertimeBatch(r, r.employee, scheduleMap));
   return { items, meta: buildPaginationMeta(pagination, total) };
 }
 

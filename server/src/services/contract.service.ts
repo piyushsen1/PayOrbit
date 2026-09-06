@@ -36,13 +36,22 @@ function withStatus(contract: Contract) {
   return { ...contract, status: computeContractStatus(contract.endDate) };
 }
 
+/**
+ * Next sequence number for this year, based on the highest existing suffix —
+ * NOT a row count. A count-based scheme collides the moment any contract for
+ * the year is ever deleted (count drops, but the max-numbered row is still
+ * there), e.g. contracts 0002-0005 exist, 0001 was deleted, count=4 would
+ * produce "0005" again instead of "0006".
+ */
 async function nextContractNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await contractRepository()
+  const result = await contractRepository()
     .createQueryBuilder('contract')
+    .select(`MAX(CAST(SUBSTRING(contract.contract_number FROM '\\d+$') AS INTEGER))`, 'maxSeq')
     .where('contract.contract_number LIKE :pattern', { pattern: `CON/${year}/%` })
-    .getCount();
-  return `CON/${year}/${String(count + 1).padStart(4, '0')}`;
+    .getRawOne<{ maxSeq: string | null }>();
+  const nextSeq = (Number(result?.maxSeq) || 0) + 1;
+  return `CON/${year}/${String(nextSeq).padStart(4, '0')}`;
 }
 
 /** Enforces "only one Running contract per employee per period." */

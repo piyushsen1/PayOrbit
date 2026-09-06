@@ -45,6 +45,26 @@ async function withBalance(allocation: TimeOffAllocation) {
   return { ...allocation, taken, remaining: Number((allocated - taken).toFixed(2)) };
 }
 
+/** One grouped-SUM query for every allocation on the page, instead of one query per row. */
+async function computeTakenBatch(allocationIds: string[]): Promise<Map<string, number>> {
+  if (allocationIds.length === 0) return new Map();
+  const rows = await requestRepository()
+    .createQueryBuilder('request')
+    .select('request.allocation_id', 'allocationId')
+    .addSelect('COALESCE(SUM(request.duration), 0)', 'sum')
+    .where('request.allocation_id IN (:...allocationIds)', { allocationIds })
+    .andWhere('request.status = :status', { status: TimeOffRequestStatus.APPROVED })
+    .groupBy('request.allocation_id')
+    .getRawMany<{ allocationId: string; sum: string }>();
+  return new Map(rows.map((r) => [r.allocationId, Number(r.sum)]));
+}
+
+function withBalanceBatch(allocation: TimeOffAllocation, takenMap: Map<string, number>) {
+  const taken = takenMap.get(allocation.id) ?? 0;
+  const allocated = Number(allocation.allocated);
+  return { ...allocation, taken, remaining: Number((allocated - taken).toFixed(2)) };
+}
+
 export async function listAllocations(
   filter?: { employeeId?: string; status?: TimeOffAllocationStatus; search?: string },
   pagination: PaginationParams = parsePagination({})
@@ -66,7 +86,8 @@ export async function listAllocations(
   }
 
   const [allocations, total] = await qb.getManyAndCount();
-  const items = await Promise.all(allocations.map(withBalance));
+  const takenMap = await computeTakenBatch(allocations.map((a) => a.id));
+  const items = allocations.map((a) => withBalanceBatch(a, takenMap));
   return { items, meta: buildPaginationMeta(pagination, total) };
 }
 
